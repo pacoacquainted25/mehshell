@@ -47,10 +47,34 @@ type seg struct {
 
 // ── Main ─────────────────────────────────────────────────────────
 
+const zshInit = `zmodload zsh/datetime 2>/dev/null
+typeset -gi _mehshell_ts=0
+_mehshell_preexec() { _mehshell_ts=$EPOCHSECONDS }
+_mehshell_precmd() {
+  local e=$?
+  local d=0
+  (( _mehshell_ts > 0 )) && d=$(( EPOCHSECONDS - _mehshell_ts ))
+  _mehshell_ts=0
+  eval "$(mehshell $e $d $COLUMNS)"
+}
+preexec_functions+=(_mehshell_preexec)
+precmd_functions+=(_mehshell_precmd)`
+
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--version" {
-		fmt.Println("mehshell", Version)
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--version":
+			fmt.Println("mehshell", Version)
+			return
+		case "init":
+			if len(os.Args) > 2 && os.Args[2] == "zsh" {
+				fmt.Println(zshInit)
+			} else {
+				fmt.Fprintln(os.Stderr, "usage: mehshell init zsh")
+				os.Exit(1)
+			}
+			return
+		}
 	}
 
 	exitCode := 0

@@ -42,18 +42,7 @@ go install github.com/blackflame007/mehshell@latest
 Add this to your `.zshrc`:
 
 ```zsh
-zmodload zsh/datetime 2>/dev/null
-typeset -gi _mehshell_ts=0
-_mehshell_preexec() { _mehshell_ts=$EPOCHSECONDS }
-_mehshell_precmd() {
-    local exit_code=$?
-    local dur=0
-    (( _mehshell_ts > 0 )) && dur=$(( EPOCHSECONDS - _mehshell_ts ))
-    _mehshell_ts=0
-    eval "$(mehshell $exit_code $dur $COLUMNS)"
-}
-preexec_functions+=(_mehshell_preexec)
-precmd_functions+=(_mehshell_precmd)
+eval "$(mehshell init zsh)"
 ```
 
 ## Benchmarks

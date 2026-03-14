@@ -184,7 +184,7 @@ func segGit(cwd string) string {
 	}
 
 	dirty := gitDirty(repoDir)
-	result := fc(cBlue, "\ue0a0") + " " + fc(cMagenta, branch)
+	result := fc(cBlue, "\uf126 ") + fc(cMagenta, branch)
 	if dirty != "" {
 		result += " " + dirty
 	}
@@ -243,7 +243,7 @@ func segGo(cwd string) string {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "go ") {
 			ver := strings.Fields(line)[1]
-			return fc(cCyan, "\ue627 "+ver)
+			return fc(cCyan, "\ue724 "+ver)
 		}
 	}
 	return ""
@@ -291,7 +291,7 @@ func segAWS() string {
 	if profile == "" {
 		return ""
 	}
-	return fc(cOrange, "\uf270 "+profile)
+	return fc(cOrange, "\uf52c "+profile)
 }
 
 func segDuration(secs int) string {

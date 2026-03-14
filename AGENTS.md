@@ -1,97 +1,147 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-03-14
+**Commit:** 0e4c334
 **Branch:** master
 
 ## OVERVIEW
 
-Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`. Supports instant prompt, transient prompt, vi mode, and config file at `~/.config/mehshell/config`.
+Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`. Supports three styles (lean/classic/rainbow), instant prompt, transient prompt, vi mode, icons toggle, and config file at `~/.config/mehshell/config`.
 
 ## STRUCTURE
 
 ```
 mehshell/
-├── main.go              # ALL application code (497 lines, 20 functions)
+├── main.go              # Entry point, CLI dispatch, segment orchestration (196 lines)
+├── config.go            # Config struct, loadConfig(), defaultConfig(), configPath() (137 lines)
+├── segments.go          # All 20 seg*() implementations + hasMarkerUp() (532 lines)
+├── render.go            # Color constants, fc(), powerline rendering, visibleWidth() (156 lines)
+├── git.go               # gitBranch() zero-fork detection, gitDirty() with 150ms timeout (101 lines)
+├── init.go              # zshInitScript() — generates zsh hooks (55 lines)
 ├── go.mod               # Go 1.22, zero dependencies
-├── .goreleaser.yml      # Cross-platform release builds
+├── config.example       # Reference config with all options documented
+├── .goreleaser.yml      # Cross-platform release builds + Homebrew tap
 ├── .github/workflows/
-│   └── release.yml      # Tag-triggered GoReleaser CI
+│   └── release.yml      # Auto-tag → GoReleaser → AUR publish pipeline
+├── aur/
+│   ├── PKGBUILD         # Arch Linux package definition
+│   └── LICENSE          # MIT license for AUR
 ├── README.md
 └── .gitignore           # Excludes: mehshell binary, dist/
 ```
 
-Single-file monolith. No packages, no internal/, no cmd/. Intentional — project is <500 lines.
+Six-file layout, single `main` package. No `internal/`, `cmd/`, `pkg/` — intentional at ~1200 lines.
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add/modify prompt segment | `main.go` segment registration in `main()` | Follow `seg*()` pattern, gate with `on["name"]` |
-| Config system | `main.go` `config` struct, `loadConfig()`, `configPath()` | `~/.config/mehshell/config`, key=value format |
-| Zsh init script | `main.go` `zshInitScript()` | Dynamic generation based on config |
-| Git detection | `main.go` `gitBranch()`, `gitDirty()` | Zero-fork branch via `.git/HEAD`, 150ms timeout on dirty |
-| Color constants | `main.go` L23-32 | Zsh 256-color codes |
-| Version injection | `main.go` L19 | Set via ldflags: `-X main.Version={{.Version}}` |
-| Release config | `.goreleaser.yml` | Linux + macOS, amd64 + arm64, CGO off |
-| CI pipeline | `.github/workflows/release.yml` | Triggers on `v*` tags |
+| Add/modify prompt segment | `segments.go` for `seg*()` impl, `main.go` for registration | Follow `seg*()` pattern, gate with `on["name"]`, register via `add()` |
+| Add config option | `config.go` — struct + `defaultConfig()` + `loadConfig()` switch | Also update `defaultConfigFile` const and `config.example` |
+| Change rendering / styles | `render.go` | `renderPowerlineLeft/Right()` for classic/rainbow, `joinSegs()` for lean |
+| Prompt layout (line1/line2) | `main.go` lines 162-195 | Style switch at L169, padding calc, `PROMPT` output |
+| Git detection | `git.go` | `gitBranch()` zero-fork via `.git/HEAD`, `gitDirty()` 150ms timeout |
+| Zsh init script | `init.go` | Dynamic generation based on config (transient, instant, vi mode) |
+| Color constants | `render.go` L9-18 | Zsh 256-color codes: `cCyan=75`, `cBlue=39`, etc. |
+| Version injection | `main.go` L13 | `var Version = "dev"`, set via ldflags: `-X main.Version={{.Version}}` |
+| Release config | `.goreleaser.yml` | Linux + macOS, amd64 + arm64, CGO off, Homebrew tap |
+| CI pipeline | `.github/workflows/release.yml` | Auto-tag on master push → GoReleaser → AUR publish |
+| AUR package | `aur/PKGBUILD` | Update `pkgver` manually or via CI |
 
 ## ARCHITECTURE
 
 ### Execution Flow
-1. Zsh `precmd` hook calls `mehshell <exitCode> <duration> <columns>`
-2. `main()` loads config, spawns goroutines for enabled segments via `sync.WaitGroup`
-3. Each `seg*()` returns formatted string or `""` (skip)
-4. Mutex-protected append to `left`/`right` slices, sorted by `order`
-5. Right-aligned line 1 + prompt char line 2 → `PROMPT=$'...'`
+1. CLI dispatch: `--version`, `init zsh`, `config init|path`, or prompt generation
+2. `loadConfig()` reads `~/.config/mehshell/config`, merges with defaults
+3. `add()` closure spawns goroutines for each enabled segment via `sync.WaitGroup`
+4. Each `seg*()` returns formatted string or `""` (skip)
+5. Mutex-protected append to `left`/`right` slices, sorted by `order` after `wg.Wait()`
+6. Style switch: lean (box-drawing + text), classic (powerline dark bg), rainbow (powerline per-segment colors)
+7. Right-aligned line 1 + prompt char line 2 → `PROMPT=$'...'`
 
 ### Segment Registration Pattern
 ```go
-add(&left, ORDER, func() string { return segFoo(args) })
+// main.go — add() closure wraps goroutine + WaitGroup + mutex
+add(&left, ORDER, BG_COLOR, func() string { return segFoo(args) })
 ```
-- `add()` wraps goroutine + WaitGroup + mutex
-- Return `""` to hide segment
 - `order` int controls display position
+- `bg` int is background color for powerline styles (ignored in lean)
+- Return `""` to hide segment
+- Gate with `if on["name"] { add(...) }`
+
+### File Responsibilities
+| File | Role | Key Exports |
+|------|------|-------------|
+| `main.go` | Orchestration — CLI routing, concurrency, prompt assembly | `main()`, `add()` closure |
+| `config.go` | Configuration — loading, parsing, defaults | `config` struct, `loadConfig()`, `configPath()` |
+| `segments.go` | Segments — all 20 implementations | `seg*()` functions, `hasMarkerUp()` |
+| `render.go` | Rendering — colors, styles, width calculation | `fc()`, `seg` struct, `renderPowerline*()`, `visibleWidth()` |
+| `git.go` | Git — branch detection, dirty state | `gitBranch()`, `gitDirty()` |
+| `init.go` | Zsh — hook script generation | `zshInitScript()` |
 
 ### Segment Functions
-| Function | Side | Order | Trigger |
-|----------|------|-------|---------|
-| `segOS` | left | 0 | Always (reads `/etc/os-release`) |
-| `segDir` | left | 1 | Always |
-| `segGit` | left | 2 | `.git` found walking up |
-| `segNode` | left | 3 | `package.json` in cwd |
-| `segPython` | left | 4 | Marker files walking up |
-| `segGo` | left | 5 | `go.mod` in cwd |
-| `segRust` | left | 6 | `Cargo.toml` in cwd |
-| `segRuby` | left | 7 | Marker files walking up |
-| `segJava` | left | 8 | `pom.xml`, `build.gradle` in cwd |
-| `segConda` | right | 0 | `$CONDA_DEFAULT_ENV` set (not "base") |
-| `segVenv` | right | 1 | `$VIRTUAL_ENV` set |
-| `segK8s` | right | 2 | K8s manifest in cwd |
-| `segTerraform` | right | 3 | `.tf` files in cwd |
-| `segDocker` | right | 4 | Dockerfile/compose in cwd |
-| `segAWS` | right | 5 | `$AWS_PROFILE` set |
-| `segAzure` | right | 6 | `$AZURE_DEFAULTS_GROUP` set |
-| `segGCloud` | right | 7 | `$CLOUDSDK_CORE_PROJECT` / `$GCLOUD_PROJECT` set |
-| `segBattery` | right | 8 | Battery present (Linux `/sys/`, macOS `pmset`) |
-| `segDuration` | right | 9 | Duration ≥ 3s |
-| `segTime` | right | 10 | Always |
+| Function | File:Line | Side | Order | BG | Trigger |
+|----------|-----------|------|-------|----|---------|
+| `segOS` | segments.go:16 | left | 0 | 24 | Always (reads `/etc/os-release`); hidden when `icons=false` |
+| `segDir` | segments.go:44 | left | 1 | 31 | Always |
+| `segGit` | segments.go:55 | left | 2 | 97 | `.git` found walking up |
+| `segNode` | segments.go:74 | left | 3 | 34 | `package.json` in cwd |
+| `segPython` | segments.go:98 | left | 4 | 136 | Marker files walking up |
+| `segGo` | segments.go:121 | left | 5 | 37 | `go.mod` in cwd |
+| `segRust` | segments.go:142 | left | 6 | 130 | `Cargo.toml` in cwd |
+| `segRuby` | segments.go:184 | left | 7 | 124 | Marker files walking up |
+| `segJava` | segments.go:210 | left | 8 | 94 | `pom.xml`, `build.gradle`, `build.gradle.kts` in cwd |
+| `segConda` | segments.go:245 | right | 0 | 34 | `$CONDA_DEFAULT_ENV` set (not "base") |
+| `segVenv` | segments.go:257 | right | 1 | 34 | `$VIRTUAL_ENV` set |
+| `segK8s` | segments.go:269 | right | 2 | 25 | K8s manifest in cwd (skaffold, helmfile, Chart, kustomization) |
+| `segTerraform` | segments.go:306 | right | 3 | 57 | `.tf` files in cwd |
+| `segDocker` | segments.go:341 | right | 4 | 25 | Dockerfile/compose in cwd |
+| `segAWS` | segments.go:366 | right | 5 | 166 | `$AWS_PROFILE` set |
+| `segAzure` | segments.go:378 | right | 6 | 25 | `$AZURE_DEFAULTS_GROUP` set |
+| `segGCloud` | segments.go:390 | right | 7 | 34 | `$CLOUDSDK_CORE_PROJECT` / `$GCLOUD_PROJECT` / `$GOOGLE_CLOUD_PROJECT` set |
+| `segBattery` | segments.go:408 | right | 8 | 22 | Battery present (Linux `/sys/`, macOS `pmset`) |
+| `segDuration` | segments.go:498 | right | 9 | 136 | Duration ≥ 3s |
+| `segTime` | segments.go:514 | right | 10 | 238 | Always |
+
+### External Commands & Timeouts
+| Segment | Command | Timeout | Fallback |
+|---------|---------|---------|----------|
+| `segNode` | `node --version` | 100ms | `.node-version`, `.nvmrc` files first |
+| `segPython` | `python --version` | 100ms | `.python-version` file first |
+| `segRust` | `rustc --version` | 100ms | `rust-toolchain`, `.rust-version`, `rust-toolchain.toml` first |
+| `segRuby` | `ruby --version` | 100ms | `.ruby-version` file first |
+| `segJava` | `java -version` | 100ms | `.java-version` file first |
+| `segTerraform` | `terraform version` | 100ms | `.terraform-version` file first |
+| `segBattery` (macOS) | `pmset -g batt` | 100ms | — |
+| `gitDirty` | `git status --porcelain` | **150ms** | Returns `""` on timeout |
+
+### Styles
+| Style | Description | Rendering |
+|-------|-------------|-----------|
+| `lean` (default) | Colored text, no backgrounds | `╭─ segments...` / `╰─❯` with `joinSegs()` |
+| `classic` | Powerline with dark grey (238) background | `renderPowerlineLeft/Right()` with `rainbow=false` |
+| `rainbow` | Powerline with per-segment colored backgrounds | `renderPowerlineLeft/Right()` with `rainbow=true`, uses `contrastFg()` |
 
 ## CONVENTIONS
 
-- **Naming**: `seg*()` for segments, `git*()` for git helpers, short vars (`cwd`, `wg`, `mu`)
+- **Naming**: `seg*()` for segments, `git*()` for git helpers, short vars (`cwd`, `wg`, `mu`, `cfg`, `on`)
 - **Colors**: Use `fc(cColor, text)` helper — never raw `%F{N}` strings
 - **Error handling**: Return `""` on any error. Never panic, never log.
 - **External commands**: Always wrap in `context.WithTimeout` (100-150ms)
 - **File reads over forks**: Prefer `os.ReadFile` over `exec.Command` when possible
 - **Section headers**: ASCII box drawing (`// ── Section ──────`)
 - **No dependencies**: Stdlib only. Do not add external modules.
+- **Icons toggle**: Every segment showing an icon must check the `icons bool` param and provide a text fallback
+- **Segment signature**: `seg*(cwd string, icons bool) string` for most; env-only segments take `(icons bool)`
+- **Config changes**: Update three places — `config` struct, `defaultConfig()`, `loadConfig()` switch, plus `defaultConfigFile` const and `config.example`
 
 ## ANTI-PATTERNS
 
-- **No `as any` equivalent**: Don't use blank identifier to ignore important errors
 - **No blocking commands**: Every `exec.Command` MUST have a context timeout
 - **No `log.*` or `fmt.Println` to stderr**: Silent operation only (stdout is eval'd by zsh)
 - **Don't print to stdout arbitrarily**: Output is `eval`'d — stray output breaks the shell
+- **No blank identifier for important errors**: Don't use `_ = err` to swallow errors that affect correctness
+- **No external dependencies**: Do not add modules to go.mod
 
 ## COMMANDS
 
@@ -114,7 +164,7 @@ go build
 # Version
 ./mehshell --version
 
-# Release (auto on push to master)
+# Release (auto on push to master — auto-tags, builds, publishes to Homebrew + AUR)
 git push origin master
 ```
 
@@ -123,8 +173,10 @@ git push origin master
 - **Binary in repo**: Compiled `mehshell` ELF exists at root (gitignored but present). Don't confuse with source.
 - **No tests**: No `*_test.go` files exist. `go test` has nothing to run.
 - **No linter config**: No golangci-lint, relies on `gofmt` defaults.
-- **Nerd Font required**: Icons render as boxes without a patched font.
+- **No LICENSE at root**: License file only in `aur/` directory.
+- **Nerd Font required**: Icons render as boxes without a patched font. `icons=false` switches to text labels.
 - **Zsh only**: `init` subcommand only supports `zsh`. No bash/fish/etc.
-- **K8s segment**: Only shows when K8s manifest files exist in cwd (skaffold.yaml, Chart.yaml, etc.), not just when kubectl is available.
-- **Node segment**: Only shows when `package.json` exists in cwd.
-- **Python segment**: Uses `hasMarkerUp()` — walks parent dirs for markers.
+- **CI secrets**: Pipeline requires `HOMEBREW_TAP_TOKEN` (or falls back to `GITHUB_TOKEN`) and `AUR_SSH_PRIVATE_KEY`.
+- **Auto-versioning**: CI auto-bumps patch version on master push (v0.1.3 → v0.1.4). No manual tagging needed.
+- **Config format**: `key = value` (key=value also works). Boolean values: `true`/`1`/`yes` → true, anything else → false.
+- **Style values**: Only `lean`, `classic`, `rainbow` are valid. Invalid values default to lean.

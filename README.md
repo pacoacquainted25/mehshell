@@ -24,6 +24,7 @@ A fast, parallelized prompt engine for zsh written in Go.
 - Instant prompt (caches last prompt for zero-latency shell startup).
 - Right-aligned segments on the first line.
 - Nerd Font icons.
+- Live config reloading. Save the file, next prompt picks it up — no shell restart required.
 - Configurable via `~/.config/mehshell/config`.
 
 ## Install

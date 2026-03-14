@@ -75,11 +75,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update PKGBUILD version
+      - name: Update PKGBUILD version and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ needs.tag.outputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
+
+          gh release download "$TAG" --pattern checksums.txt --dir /tmp
+          SHA_AMD64=$(grep 'mehshell_linux_amd64.tar.gz' /tmp/checksums.txt | awk '{print $1}')
+          SHA_ARM64=$(grep 'mehshell_linux_arm64.tar.gz' /tmp/checksums.txt | awk '{print $1}')
+
           sed -i "s/^pkgver=.*/pkgver=${VERSION}/" aur/PKGBUILD
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${SHA_AMD64}')/" aur/PKGBUILD
+          sed -i "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${SHA_ARM64}')/" aur/PKGBUILD
 
       - name: Publish to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.1

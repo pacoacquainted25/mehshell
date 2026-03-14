@@ -93,6 +93,8 @@ This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`)
 | `transient_prompt` | `true` | Collapse previous prompts to `❯` on Enter. Set `false` to preserve full prompts with timestamps in scrollback. |
 | `instant_prompt` | `true` | Show cached prompt immediately on shell startup. |
 | `vi_mode` | `true` | Swap prompt character on vi keymap change (`❯`/`❮`). |
+| `icons` | `true` | Show Nerd Font icons. Set `false` for text labels (`go`, `py`, `rs`, etc.). |
+| `style` | `lean` | Prompt style: `lean` (colored text, no backgrounds), `classic` (powerline with dark grey background), or `rainbow` (powerline with per-segment colored backgrounds). |
 
 ### Left Segments
 

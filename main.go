@@ -44,6 +44,7 @@ func fc(color int, s string) string {
 type seg struct {
 	text  string
 	order int
+	bg    int
 }
 
 // ── Config ───────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ type config struct {
 	TransientPrompt bool
 	InstantPrompt   bool
 	ViMode          bool
+	Icons           bool
+	Style           string
 	Segments        map[string]bool
 }
 
@@ -60,6 +63,8 @@ func defaultConfig() config {
 		TransientPrompt: true,
 		InstantPrompt:   true,
 		ViMode:          true,
+		Icons:           true,
+		Style:           "lean",
 		Segments: map[string]bool{
 			"os": true, "dir": true, "git": true, "node": true,
 			"python": true, "go": true, "rust": true, "ruby": true,
@@ -104,6 +109,13 @@ func loadConfig() config {
 			cfg.InstantPrompt = on
 		case "vi_mode":
 			cfg.ViMode = on
+		case "icons":
+			cfg.Icons = on
+		case "style":
+			switch val {
+			case "lean", "classic", "rainbow":
+				cfg.Style = val
+			}
 		default:
 			if _, ok := cfg.Segments[key]; ok {
 				cfg.Segments[key] = on
@@ -129,6 +141,15 @@ instant_prompt = true
 
 # Swap prompt character on vi keymap change.
 vi_mode = true
+
+# Show Nerd Font icons. Set to false for text labels instead.
+icons = true
+
+# Prompt style: lean, classic, or rainbow.
+#   lean    - colored text, no backgrounds (default)
+#   classic - powerline arrows with segment-colored backgrounds
+#   rainbow - powerline arrows with cycling rainbow backgrounds
+style = lean
 
 # ── Left segments ───────────────────────────────────────
 
@@ -206,6 +227,100 @@ func zshInitScript(cfg config) string {
 	return b.String()
 }
 
+// ── Style rendering ──────────────────────────────────────────────
+
+func stripColors(s string) string {
+	for _, prefix := range []string{"%F{", "%K{"} {
+		for {
+			idx := strings.Index(s, prefix)
+			if idx == -1 {
+				break
+			}
+			end := strings.Index(s[idx:], "}")
+			if end == -1 {
+				break
+			}
+			s = s[:idx] + s[idx+end+1:]
+		}
+	}
+	for _, esc := range []string{"%f", "%k"} {
+		s = strings.ReplaceAll(s, esc, "")
+	}
+	s = strings.ReplaceAll(s, "%%", "%")
+	return s
+}
+
+func escPercent(s string) string {
+	return strings.ReplaceAll(s, "%", "%%")
+}
+
+func contrastFg(bg int) int {
+	switch bg {
+	case 178, 136, 220, 3, 76, 2, 208:
+		return 0
+	default:
+		return 255
+	}
+}
+
+func renderPowerlineLeft(segs []seg, rainbow bool) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if rainbow {
+		for i, s := range segs {
+			fg := contrastFg(s.bg)
+			plain := stripColors(s.text)
+			b.WriteString(fmt.Sprintf("%%K{%d}%%F{%d} %s ", s.bg, fg, escPercent(plain)))
+			if i < len(segs)-1 {
+				b.WriteString(fmt.Sprintf("%%F{%d}%%K{%d}\ue0b0", s.bg, segs[i+1].bg))
+			} else {
+				b.WriteString(fmt.Sprintf("%%f%%k%%F{%d}\ue0b0%%f", s.bg))
+			}
+		}
+	} else {
+		b.WriteString(fmt.Sprintf("%%K{%d}", 238))
+		for i, s := range segs {
+			b.WriteString(fmt.Sprintf(" %s ", s.text))
+			if i < len(segs)-1 {
+				b.WriteString(fmt.Sprintf("%%F{%d}\ue0b1%%f", 246))
+			}
+		}
+		b.WriteString(fmt.Sprintf("%%f%%k%%F{%d}\ue0b0%%f", 238))
+	}
+	return b.String()
+}
+
+func renderPowerlineRight(segs []seg, rainbow bool) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if rainbow {
+		for i, s := range segs {
+			fg := contrastFg(s.bg)
+			plain := stripColors(s.text)
+			if i == 0 {
+				b.WriteString(fmt.Sprintf("%%F{%d}\ue0b2%%K{%d}%%F{%d} %s %%f", s.bg, s.bg, fg, escPercent(plain)))
+			} else {
+				b.WriteString(fmt.Sprintf("%%F{%d}\ue0b2%%K{%d}%%F{%d} %s %%f", s.bg, s.bg, fg, escPercent(plain)))
+			}
+		}
+		b.WriteString("%k")
+	} else {
+		b.WriteString(fmt.Sprintf("%%F{%d}\ue0b2%%K{%d}", 238, 238))
+		for i, s := range segs {
+			b.WriteString(fmt.Sprintf(" %s ", s.text))
+			if i < len(segs)-1 {
+				b.WriteString(fmt.Sprintf("%%F{%d}\ue0b3%%f", 246))
+			}
+		}
+		b.WriteString("%f%k")
+	}
+	return b.String()
+}
+
 // ── Main ─────────────────────────────────────────────────────────
 
 func main() {
@@ -276,77 +391,78 @@ func main() {
 	var mu sync.Mutex
 	var left, right []seg
 
-	add := func(dst *[]seg, order int, fn func() string) {
+	add := func(dst *[]seg, order int, bg int, fn func() string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			if t := fn(); t != "" {
 				mu.Lock()
-				*dst = append(*dst, seg{t, order})
+				*dst = append(*dst, seg{t, order, bg})
 				mu.Unlock()
 			}
 		}()
 	}
 
+	icons := cfg.Icons
 	if on["os"] {
-		add(&left, 0, func() string { return segOS() })
+		add(&left, 0, 24, func() string { return segOS(icons) })
 	}
 	if on["dir"] {
-		add(&left, 1, func() string { return segDir(cwd, home) })
+		add(&left, 1, 31, func() string { return segDir(cwd, home) })
 	}
 	if on["git"] {
-		add(&left, 2, func() string { return segGit(cwd) })
+		add(&left, 2, 97, func() string { return segGit(cwd, icons) })
 	}
 	if on["node"] {
-		add(&left, 3, func() string { return segNode(cwd) })
+		add(&left, 3, 34, func() string { return segNode(cwd, icons) })
 	}
 	if on["python"] {
-		add(&left, 4, func() string { return segPython(cwd) })
+		add(&left, 4, 136, func() string { return segPython(cwd, icons) })
 	}
 	if on["go"] {
-		add(&left, 5, func() string { return segGo(cwd) })
+		add(&left, 5, 37, func() string { return segGo(cwd, icons) })
 	}
 	if on["rust"] {
-		add(&left, 6, func() string { return segRust(cwd) })
+		add(&left, 6, 130, func() string { return segRust(cwd, icons) })
 	}
 	if on["ruby"] {
-		add(&left, 7, func() string { return segRuby(cwd) })
+		add(&left, 7, 124, func() string { return segRuby(cwd, icons) })
 	}
 	if on["java"] {
-		add(&left, 8, func() string { return segJava(cwd) })
+		add(&left, 8, 94, func() string { return segJava(cwd, icons) })
 	}
 	if on["conda"] {
-		add(&right, 0, func() string { return segConda() })
+		add(&right, 0, 34, func() string { return segConda(icons) })
 	}
 	if on["venv"] {
-		add(&right, 1, func() string { return segVenv() })
+		add(&right, 1, 34, func() string { return segVenv(icons) })
 	}
 	if on["k8s"] {
-		add(&right, 2, func() string { return segK8s(cwd, home) })
+		add(&right, 2, 25, func() string { return segK8s(cwd, home, icons) })
 	}
 	if on["terraform"] {
-		add(&right, 3, func() string { return segTerraform(cwd) })
+		add(&right, 3, 57, func() string { return segTerraform(cwd, icons) })
 	}
 	if on["docker"] {
-		add(&right, 4, func() string { return segDocker(cwd) })
+		add(&right, 4, 25, func() string { return segDocker(cwd, icons) })
 	}
 	if on["aws"] {
-		add(&right, 5, func() string { return segAWS() })
+		add(&right, 5, 166, func() string { return segAWS(icons) })
 	}
 	if on["azure"] {
-		add(&right, 6, func() string { return segAzure() })
+		add(&right, 6, 25, func() string { return segAzure(icons) })
 	}
 	if on["gcloud"] {
-		add(&right, 7, func() string { return segGCloud() })
+		add(&right, 7, 34, func() string { return segGCloud(icons) })
 	}
 	if on["battery"] {
-		add(&right, 8, func() string { return segBattery() })
+		add(&right, 8, 22, func() string { return segBattery(icons) })
 	}
 	if on["duration"] {
-		add(&right, 9, func() string { return segDuration(duration) })
+		add(&right, 9, 136, func() string { return segDuration(duration) })
 	}
 	if on["time"] {
-		add(&right, 10, func() string { return segTime() })
+		add(&right, 10, 238, func() string { return segTime() })
 	}
 
 	wg.Wait()
@@ -354,39 +470,49 @@ func main() {
 	sort.Slice(left, func(i, j int) bool { return left[i].order < left[j].order })
 	sort.Slice(right, func(i, j int) bool { return right[i].order < right[j].order })
 
-	leftStr := joinSegs(left, " ")
-	rightStr := joinSegs(right, "  ")
+	var line1, line2 string
 
-	// Right-align line 1: pad between left and right
-	prefix := fc(cCyan, "╭─") + " "
-	prefixVis := 3 // "╭─ "
-	leftVis := visibleWidth(leftStr)
-	rightVis := visibleWidth(rightStr)
-	pad := columns - prefixVis - leftVis - rightVis
-	if pad < 1 {
-		pad = 1
-	}
-
-	line1 := prefix + leftStr + strings.Repeat(" ", pad) + rightStr
-
-	// Prompt char
-	char := fc(cGreen, "❯")
+	charColor := cGreen
 	if exitCode != 0 {
-		char = fc(cRed, "❯")
+		charColor = cRed
 	}
-	line2 := fc(cCyan, "╰─") + char
 
-	// Escape for $'...' quoting
+	switch cfg.Style {
+	case "classic", "rainbow":
+		rainbow := cfg.Style == "rainbow"
+		lStr := renderPowerlineLeft(left, rainbow)
+		rStr := renderPowerlineRight(right, rainbow)
+		pad := columns - visibleWidth(lStr) - visibleWidth(rStr)
+		if pad < 1 {
+			pad = 1
+		}
+		line1 = lStr + strings.Repeat(" ", pad) + rStr
+		line2 = fc(charColor, "❯")
+	default:
+		leftStr := joinSegs(left, " ")
+		rightStr := joinSegs(right, "  ")
+		prefix := fc(cCyan, "╭─") + " "
+		prefixVis := 3
+		pad := columns - prefixVis - visibleWidth(leftStr) - visibleWidth(rightStr)
+		if pad < 1 {
+			pad = 1
+		}
+		line1 = prefix + leftStr + strings.Repeat(" ", pad) + rightStr
+		line2 = fc(cCyan, "╰─") + fc(charColor, "❯")
+	}
+
 	l1 := escShell(line1)
 	l2 := escShell(line2)
-
 	fmt.Printf("PROMPT=$'\\n%s\\n%s '\n", l1, l2)
 }
 
 // ── Segments ─────────────────────────────────────────────────────
 
-func segOS() string {
-	icon := "\uf17c" // linux tux
+func segOS(icons bool) string {
+	if !icons {
+		return ""
+	}
+	icon := "\uf17c"
 	switch runtime.GOOS {
 	case "linux":
 		if data, err := os.ReadFile("/etc/os-release"); err == nil {
@@ -421,95 +547,118 @@ func segDir(cwd, home string) string {
 	return fc(cBlue, dir)
 }
 
-func segGit(cwd string) string {
+func segGit(cwd string, icons bool) string {
 	branch, repoDir := gitBranch(cwd)
 	if branch == "" {
 		return ""
 	}
 
 	dirty := gitDirty(repoDir)
-	result := fc(cBlue, "\uf126 ") + fc(cMagenta, branch)
+	var result string
+	if icons {
+		result = fc(cBlue, "\uf126 ") + fc(cMagenta, branch)
+	} else {
+		result = fc(cMagenta, branch)
+	}
 	if dirty != "" {
 		result += " " + dirty
 	}
 	return result
 }
 
-func segNode(cwd string) string {
+func segNode(cwd string, icons bool) string {
 	if _, err := os.Stat(filepath.Join(cwd, "package.json")); err != nil {
 		return ""
 	}
-	// Try reading version files first (no fork)
+	prefix := "node "
+	if icons {
+		prefix = "\ue718 "
+	}
 	for _, f := range []string{".node-version", ".nvmrc"} {
 		if data, err := os.ReadFile(filepath.Join(cwd, f)); err == nil {
 			ver := strings.TrimSpace(string(data))
 			if ver != "" {
-				return fc(cGreen, "\ue718 "+ver)
+				return fc(cGreen, prefix+ver)
 			}
 		}
 	}
-	// Fallback: run node --version
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	if out, err := exec.CommandContext(ctx, "node", "--version").Output(); err == nil {
-		return fc(cGreen, "\ue718 "+strings.TrimSpace(string(out)))
+		return fc(cGreen, prefix+strings.TrimSpace(string(out)))
 	}
 	return ""
 }
 
-func segPython(cwd string) string {
+func segPython(cwd string, icons bool) string {
 	if !hasMarkerUp(cwd, []string{".python-version", "pyproject.toml", "setup.py", "Pipfile", "requirements.txt"}) {
 		return ""
+	}
+	prefix := "py "
+	if icons {
+		prefix = "\ue73c "
 	}
 	if data, err := os.ReadFile(filepath.Join(cwd, ".python-version")); err == nil {
 		ver := strings.TrimSpace(string(data))
 		if ver != "" {
-			return fc(cYellow, "\ue73c "+ver)
+			return fc(cYellow, prefix+ver)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	if out, err := exec.CommandContext(ctx, "python", "--version").Output(); err == nil {
 		ver := strings.TrimPrefix(strings.TrimSpace(string(out)), "Python ")
-		return fc(cYellow, "\ue73c "+ver)
+		return fc(cYellow, prefix+ver)
 	}
 	return ""
 }
 
-func segGo(cwd string) string {
+func segGo(cwd string, icons bool) string {
 	gomod := filepath.Join(cwd, "go.mod")
 	data, err := os.ReadFile(gomod)
 	if err != nil {
 		return ""
+	}
+	prefix := "go "
+	if icons {
+		prefix = "\ue627 "
 	}
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "go ") {
 			ver := strings.Fields(line)[1]
-			return fc(cCyan, "\ue724 "+ver)
+			return fc(cCyan, prefix+ver)
 		}
 	}
 	return ""
 }
 
-func segConda() string {
+func segConda(icons bool) string {
 	env := os.Getenv("CONDA_DEFAULT_ENV")
 	if env == "" || env == "base" {
 		return ""
 	}
-	return fc(cGreen, "\ue73c "+env)
+	prefix := "conda "
+	if icons {
+		prefix = "\ue73c "
+	}
+	return fc(cGreen, prefix+env)
 }
 
-func segVenv() string {
+func segVenv(icons bool) string {
 	venv := os.Getenv("VIRTUAL_ENV")
 	if venv == "" {
 		return ""
 	}
-	return fc(cGreen, "\ue73c "+filepath.Base(venv))
+	prefix := "venv "
+	if icons {
+		prefix = "\ue73c "
+	}
+	return fc(cGreen, prefix+filepath.Base(venv))
 }
 
-func segK8s(cwd, home string) string {
+func segK8s(cwd, home string, icons bool) string {
 	markers := []string{"skaffold.yaml", "helmfile.yaml", "Chart.yaml", "kustomization.yaml"}
 	hasMarker := false
 	for _, m := range markers {
@@ -535,19 +684,27 @@ func segK8s(cwd, home string) string {
 		if strings.HasPrefix(line, "current-context:") {
 			ctx := strings.TrimSpace(strings.TrimPrefix(line, "current-context:"))
 			if ctx != "" && ctx != "\"\"" {
-				return fc(cBlue, "\u2388 "+ctx)
+				prefix := "k8s "
+				if icons {
+					prefix = "\u2388 "
+				}
+				return fc(cBlue, prefix+ctx)
 			}
 		}
 	}
 	return ""
 }
 
-func segAWS() string {
+func segAWS(icons bool) string {
 	profile := os.Getenv("AWS_PROFILE")
 	if profile == "" {
 		return ""
 	}
-	return fc(cOrange, "\uf52c "+profile)
+	prefix := "aws "
+	if icons {
+		prefix = "\uf52c "
+	}
+	return fc(cOrange, prefix+profile)
 }
 
 func segDuration(secs int) string {
@@ -572,15 +729,19 @@ func segTime() string {
 
 // ── Additional segments ─────────────────────────────────────────
 
-func segRust(cwd string) string {
+func segRust(cwd string, icons bool) string {
 	if _, err := os.Stat(filepath.Join(cwd, "Cargo.toml")); err != nil {
 		return ""
+	}
+	prefix := "rs "
+	if icons {
+		prefix = "\ue7a8 "
 	}
 	for _, f := range []string{"rust-toolchain", ".rust-version"} {
 		if data, err := os.ReadFile(filepath.Join(cwd, f)); err == nil {
 			ver := strings.TrimSpace(string(data))
 			if ver != "" {
-				return fc(cOrange, "\ue7a8 "+ver)
+				return fc(cOrange, prefix+ver)
 			}
 		}
 	}
@@ -592,7 +753,7 @@ func segRust(cwd string) string {
 				if len(parts) == 2 {
 					ver := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
 					if ver != "" {
-						return fc(cOrange, "\ue7a8 "+ver)
+						return fc(cOrange, prefix+ver)
 					}
 				}
 			}
@@ -605,19 +766,23 @@ func segRust(cwd string) string {
 		if i := strings.Index(ver, " "); i != -1 {
 			ver = ver[:i]
 		}
-		return fc(cOrange, "\ue7a8 "+ver)
+		return fc(cOrange, prefix+ver)
 	}
 	return ""
 }
 
-func segRuby(cwd string) string {
+func segRuby(cwd string, icons bool) string {
 	if !hasMarkerUp(cwd, []string{".ruby-version", "Gemfile", "Rakefile"}) {
 		return ""
+	}
+	prefix := "rb "
+	if icons {
+		prefix = "\ue739 "
 	}
 	if data, err := os.ReadFile(filepath.Join(cwd, ".ruby-version")); err == nil {
 		ver := strings.TrimSpace(string(data))
 		if ver != "" {
-			return fc(cRed, "\ue739 "+ver)
+			return fc(cRed, prefix+ver)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -627,12 +792,12 @@ func segRuby(cwd string) string {
 		if i := strings.Index(ver, " "); i != -1 {
 			ver = ver[:i]
 		}
-		return fc(cRed, "\ue739 "+ver)
+		return fc(cRed, prefix+ver)
 	}
 	return ""
 }
 
-func segJava(cwd string) string {
+func segJava(cwd string, icons bool) string {
 	markers := []string{"pom.xml", "build.gradle", "build.gradle.kts", ".java-version"}
 	found := false
 	for _, m := range markers {
@@ -644,10 +809,14 @@ func segJava(cwd string) string {
 	if !found {
 		return ""
 	}
+	prefix := "java "
+	if icons {
+		prefix = "\ue738 "
+	}
 	if data, err := os.ReadFile(filepath.Join(cwd, ".java-version")); err == nil {
 		ver := strings.TrimSpace(string(data))
 		if ver != "" {
-			return fc(cOrange, "\ue738 "+ver)
+			return fc(cOrange, prefix+ver)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -656,14 +825,14 @@ func segJava(cwd string) string {
 		line := strings.SplitN(string(out), "\n", 2)[0]
 		if start := strings.Index(line, "\""); start != -1 {
 			if end := strings.Index(line[start+1:], "\""); end != -1 {
-				return fc(cOrange, "\ue738 "+line[start+1:start+1+end])
+				return fc(cOrange, prefix+line[start+1:start+1+end])
 			}
 		}
 	}
 	return ""
 }
 
-func segTerraform(cwd string) string {
+func segTerraform(cwd string, icons bool) string {
 	entries, err := os.ReadDir(cwd)
 	if err != nil {
 		return ""
@@ -678,10 +847,14 @@ func segTerraform(cwd string) string {
 	if !hasTF {
 		return ""
 	}
+	prefix := "tf "
+	if icons {
+		prefix = "\uf0ac "
+	}
 	if data, err := os.ReadFile(filepath.Join(cwd, ".terraform-version")); err == nil {
 		ver := strings.TrimSpace(string(data))
 		if ver != "" {
-			return fc(cMagenta, "\uf0ac "+ver)
+			return fc(cMagenta, prefix+ver)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -689,12 +862,12 @@ func segTerraform(cwd string) string {
 	if out, err := exec.CommandContext(ctx, "terraform", "version").Output(); err == nil {
 		line := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
 		line = strings.TrimPrefix(line, "Terraform ")
-		return fc(cMagenta, "\uf0ac "+line)
+		return fc(cMagenta, prefix+line)
 	}
 	return ""
 }
 
-func segDocker(cwd string) string {
+func segDocker(cwd string, icons bool) string {
 	markers := []string{"Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
 	found := false
 	for _, m := range markers {
@@ -706,24 +879,32 @@ func segDocker(cwd string) string {
 	if !found {
 		return ""
 	}
+	prefix := "docker"
+	if icons {
+		prefix = "\uf308"
+	}
 	if ctx := os.Getenv("DOCKER_CONTEXT"); ctx != "" && ctx != "default" {
-		return fc(cCyan, "\uf308 "+ctx)
+		return fc(cCyan, prefix+" "+ctx)
 	}
 	if name := os.Getenv("DOCKER_MACHINE_NAME"); name != "" {
-		return fc(cCyan, "\uf308 "+name)
+		return fc(cCyan, prefix+" "+name)
 	}
-	return fc(cCyan, "\uf308")
+	return fc(cCyan, prefix)
 }
 
-func segAzure() string {
+func segAzure(icons bool) string {
 	acct := os.Getenv("AZURE_DEFAULTS_GROUP")
 	if acct == "" {
 		return ""
 	}
-	return fc(cBlue, "\ufd03 "+acct)
+	prefix := "az "
+	if icons {
+		prefix = "\ufd03 "
+	}
+	return fc(cBlue, prefix+acct)
 }
 
-func segGCloud() string {
+func segGCloud(icons bool) string {
 	project := os.Getenv("CLOUDSDK_CORE_PROJECT")
 	if project == "" {
 		project = os.Getenv("GCLOUD_PROJECT")
@@ -734,10 +915,14 @@ func segGCloud() string {
 	if project == "" {
 		return ""
 	}
-	return fc(cGreen, "\uf1a0 "+project)
+	prefix := "gcp "
+	if icons {
+		prefix = "\uf1a0 "
+	}
+	return fc(cGreen, prefix+project)
 }
 
-func segBattery() string {
+func segBattery(icons bool) string {
 	switch runtime.GOOS {
 	case "linux":
 		for _, name := range []string{"BAT0", "BAT1", "battery"} {
@@ -771,7 +956,10 @@ func segBattery() string {
 			if status == "Charging" {
 				icon = "\uf0e7"
 			}
-			return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+			if icons {
+				return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+			}
+			return fc(color, strconv.Itoa(pct)+"%")
 		}
 	case "darwin":
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -815,7 +1003,10 @@ func segBattery() string {
 			if strings.Contains(line, "charging") && !strings.Contains(line, "discharging") {
 				icon = "\uf0e7"
 			}
-			return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+			if icons {
+				return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+			}
+			return fc(color, strconv.Itoa(pct)+"%")
 		}
 	}
 	return ""
@@ -934,20 +1125,23 @@ func hasMarkerUp(cwd string, markers []string) bool {
 }
 
 func visibleWidth(s string) int {
-	// Strip zsh prompt escapes: %F{N}...%f, %B, %b, etc.
 	stripped := s
-	for {
-		idx := strings.Index(stripped, "%F{")
-		if idx == -1 {
-			break
+	for _, prefix := range []string{"%F{", "%K{"} {
+		for {
+			idx := strings.Index(stripped, prefix)
+			if idx == -1 {
+				break
+			}
+			end := strings.Index(stripped[idx:], "}")
+			if end == -1 {
+				break
+			}
+			stripped = stripped[:idx] + stripped[idx+end+1:]
 		}
-		end := strings.Index(stripped[idx:], "}")
-		if end == -1 {
-			break
-		}
-		stripped = stripped[:idx] + stripped[idx+end+1:]
 	}
-	stripped = strings.ReplaceAll(stripped, "%f", "")
+	for _, esc := range []string{"%f", "%k"} {
+		stripped = strings.ReplaceAll(stripped, esc, "")
+	}
 	stripped = strings.ReplaceAll(stripped, "%%", "%")
 	return utf8.RuneCountInString(stripped)
 }

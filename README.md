@@ -41,7 +41,7 @@ brew install mehshell
 ### AUR (Arch Linux)
 
 ```bash
-yay -S mehshell-bin
+paru -S mehshell-bin
 ```
 
 ### Binary releases
@@ -88,43 +88,43 @@ This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`)
 
 ### Features
 
-| Option | Default | Description |
-|---|---|---|
-| `transient_prompt` | `true` | Collapse previous prompts to `❯` on Enter. Set `false` to preserve full prompts with timestamps in scrollback. |
-| `instant_prompt` | `true` | Show cached prompt immediately on shell startup. |
-| `vi_mode` | `true` | Swap prompt character on vi keymap change (`❯`/`❮`). |
-| `icons` | `true` | Show Nerd Font icons. Set `false` for text labels (`go`, `py`, `rs`, etc.). |
-| `style` | `lean` | Prompt style: `lean` (colored text, no backgrounds), `classic` (powerline with dark grey background), or `rainbow` (powerline with per-segment colored backgrounds). |
+| Option             | Default | Description                                                                                                                                                          |
+| ------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transient_prompt` | `true`  | Collapse previous prompts to `❯` on Enter. Set `false` to preserve full prompts with timestamps in scrollback.                                                       |
+| `instant_prompt`   | `true`  | Show cached prompt immediately on shell startup.                                                                                                                     |
+| `vi_mode`          | `true`  | Swap prompt character on vi keymap change (`❯`/`❮`).                                                                                                                 |
+| `icons`            | `true`  | Show Nerd Font icons. Set `false` for text labels (`go`, `py`, `rs`, etc.).                                                                                          |
+| `style`            | `lean`  | Prompt style: `lean` (colored text, no backgrounds), `classic` (powerline with dark grey background), or `rainbow` (powerline with per-segment colored backgrounds). |
 
 ### Left Segments
 
-| Option | Default | Description |
-|---|---|---|
-| `os` | `true` | OS icon (Arch, Ubuntu, Fedora, Debian, NixOS, macOS). |
-| `dir` | `true` | Current working directory. |
-| `git` | `true` | Git branch and dirty state (`✓`, `+`, `!`, `?`). |
-| `node` | `true` | Node.js version when `package.json` is present. |
-| `python` | `true` | Python version when marker files are found. |
-| `go` | `true` | Go version from `go.mod`. |
-| `rust` | `true` | Rust version when `Cargo.toml` is present. |
-| `ruby` | `true` | Ruby version when marker files are found. |
-| `java` | `true` | Java version when `pom.xml` or `build.gradle` is present. |
+| Option   | Default | Description                                               |
+| -------- | ------- | --------------------------------------------------------- |
+| `os`     | `true`  | OS icon (Arch, Ubuntu, Fedora, Debian, NixOS, macOS).     |
+| `dir`    | `true`  | Current working directory.                                |
+| `git`    | `true`  | Git branch and dirty state (`✓`, `+`, `!`, `?`).          |
+| `node`   | `true`  | Node.js version when `package.json` is present.           |
+| `python` | `true`  | Python version when marker files are found.               |
+| `go`     | `true`  | Go version from `go.mod`.                                 |
+| `rust`   | `true`  | Rust version when `Cargo.toml` is present.                |
+| `ruby`   | `true`  | Ruby version when marker files are found.                 |
+| `java`   | `true`  | Java version when `pom.xml` or `build.gradle` is present. |
 
 ### Right Segments
 
-| Option | Default | Description |
-|---|---|---|
-| `conda` | `true` | Conda environment name (skips `base`). |
-| `venv` | `true` | Python virtualenv name. |
-| `k8s` | `true` | Kubernetes context when manifest files are in cwd. |
-| `terraform` | `true` | Terraform version when `.tf` files are present. |
-| `docker` | `true` | Docker context when Dockerfile/compose is present. |
-| `aws` | `true` | AWS profile from `$AWS_PROFILE`. |
-| `azure` | `true` | Azure resource group from `$AZURE_DEFAULTS_GROUP`. |
-| `gcloud` | `true` | GCP project from `$CLOUDSDK_CORE_PROJECT`. |
-| `battery` | `true` | Battery level with charge state icon. |
-| `duration` | `true` | Command duration (shown when ≥ 3s). |
-| `time` | `true` | Current time. |
+| Option      | Default | Description                                        |
+| ----------- | ------- | -------------------------------------------------- |
+| `conda`     | `true`  | Conda environment name (skips `base`).             |
+| `venv`      | `true`  | Python virtualenv name.                            |
+| `k8s`       | `true`  | Kubernetes context when manifest files are in cwd. |
+| `terraform` | `true`  | Terraform version when `.tf` files are present.    |
+| `docker`    | `true`  | Docker context when Dockerfile/compose is present. |
+| `aws`       | `true`  | AWS profile from `$AWS_PROFILE`.                   |
+| `azure`     | `true`  | Azure resource group from `$AZURE_DEFAULTS_GROUP`. |
+| `gcloud`    | `true`  | GCP project from `$CLOUDSDK_CORE_PROJECT`.         |
+| `battery`   | `true`  | Battery level with charge state icon.              |
+| `duration`  | `true`  | Command duration (shown when ≥ 3s).                |
+| `time`      | `true`  | Current time.                                      |
 
 Set any option to `false` to disable it. After editing, restart your shell or run:
 
@@ -140,58 +140,58 @@ mehshell config path
 
 ## Benchmarks
 
-| Metric | p10k | mehshell |
-|---|---|---|
-| Shell startup | 870ms+ | 64ms |
-| Between commands | 6000ms (with vcs_info) | 28ms |
-| Prompt generation | ~45ms | 6ms |
+| Metric            | p10k                   | mehshell |
+| ----------------- | ---------------------- | -------- |
+| Shell startup     | 870ms+                 | 64ms     |
+| Between commands  | 6000ms (with vcs_info) | 28ms     |
+| Prompt generation | ~45ms                  | 6ms      |
 
 ## Feature Comparison with Powerlevel10k
 
 mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick the right tool for your workflow.
 
-| Feature | mehshell | p10k |
-|---|---|---|
-| **Architecture** | Single Go binary | Zsh scripts + gitstatusd daemon |
-| **Dependencies** | Zero (Go stdlib only) | gitstatus binary (downloaded) |
-| **Prompt generation** | ~6ms | ~45ms |
-| **Shell startup impact** | ~64ms | ~870ms+ |
-| **Configuration** | `~/.config/mehshell/config` | `~/.p10k.zsh` + config wizard |
-| **Async rendering** | Goroutines (parallel) | Zsh workers + gitstatusd |
-| **Git branch detection** | Zero-fork (reads `.git/HEAD`) | gitstatusd (libgit2) |
-| **Git dirty check** | `git status` with 150ms timeout | Async, never blocks |
-| **Instant prompt** | ✓ (cache-based) | ✓ |
-| **Transient prompt** | ✓ | ✓ |
-| **Vi mode** | ✓ (prompt char swap) | ✓ (full indicator) |
-| **Custom segments** | Add in source | Public API (`p10k segment`) |
-| **Total segments** | 20 | 67+ |
+| Feature                  | mehshell                        | p10k                            |
+| ------------------------ | ------------------------------- | ------------------------------- |
+| **Architecture**         | Single Go binary                | Zsh scripts + gitstatusd daemon |
+| **Dependencies**         | Zero (Go stdlib only)           | gitstatus binary (downloaded)   |
+| **Prompt generation**    | ~6ms                            | ~45ms                           |
+| **Shell startup impact** | ~64ms                           | ~870ms+                         |
+| **Configuration**        | `~/.config/mehshell/config`     | `~/.p10k.zsh` + config wizard   |
+| **Async rendering**      | Goroutines (parallel)           | Zsh workers + gitstatusd        |
+| **Git branch detection** | Zero-fork (reads `.git/HEAD`)   | gitstatusd (libgit2)            |
+| **Git dirty check**      | `git status` with 150ms timeout | Async, never blocks             |
+| **Instant prompt**       | ✓ (cache-based)                 | ✓                               |
+| **Transient prompt**     | ✓                               | ✓                               |
+| **Vi mode**              | ✓ (prompt char swap)            | ✓ (full indicator)              |
+| **Custom segments**      | Add in source                   | Public API (`p10k segment`)     |
+| **Total segments**       | 20                              | 67+                             |
 
 ### Segment Coverage
 
-| Segment | mehshell | p10k |
-|---|---|---|
-| OS icon | ✓ | ✓ |
-| Directory | ✓ | ✓ (smart truncation) |
-| Git | ✓ (branch + dirty) | ✓ (branch, ahead/behind, stash, conflicts) |
-| Node.js | ✓ | ✓ (+ nvm, nodenv, package name) |
-| Python | ✓ | ✓ (+ pyenv, poetry) |
-| Go | ✓ | ✓ (+ goenv) |
-| Rust | ✓ | ✓ |
-| Ruby | ✓ | ✓ (+ rvm, chruby) |
-| Java | ✓ | ✓ (+ jenv) |
-| Conda | ✓ | ✓ |
-| Virtualenv | ✓ | ✓ |
-| Kubernetes | ✓ | ✓ (+ show-on-command) |
-| Terraform | ✓ | ✓ |
-| Docker | ✓ | ✓ |
-| AWS | ✓ | ✓ (+ Elastic Beanstalk) |
-| Azure | ✓ | ✓ |
-| GCP | ✓ | ✓ |
-| Battery | ✓ | ✓ |
-| Duration | ✓ | ✓ |
-| Time | ✓ | ✓ (+ date) |
-| CPU / RAM | — | ✓ |
-| Vi mode | ✓ (prompt char) | ✓ (full indicator) |
+| Segment    | mehshell           | p10k                                       |
+| ---------- | ------------------ | ------------------------------------------ |
+| OS icon    | ✓                  | ✓                                          |
+| Directory  | ✓                  | ✓ (smart truncation)                       |
+| Git        | ✓ (branch + dirty) | ✓ (branch, ahead/behind, stash, conflicts) |
+| Node.js    | ✓                  | ✓ (+ nvm, nodenv, package name)            |
+| Python     | ✓                  | ✓ (+ pyenv, poetry)                        |
+| Go         | ✓                  | ✓ (+ goenv)                                |
+| Rust       | ✓                  | ✓                                          |
+| Ruby       | ✓                  | ✓ (+ rvm, chruby)                          |
+| Java       | ✓                  | ✓ (+ jenv)                                 |
+| Conda      | ✓                  | ✓                                          |
+| Virtualenv | ✓                  | ✓                                          |
+| Kubernetes | ✓                  | ✓ (+ show-on-command)                      |
+| Terraform  | ✓                  | ✓                                          |
+| Docker     | ✓                  | ✓                                          |
+| AWS        | ✓                  | ✓ (+ Elastic Beanstalk)                    |
+| Azure      | ✓                  | ✓                                          |
+| GCP        | ✓                  | ✓                                          |
+| Battery    | ✓                  | ✓                                          |
+| Duration   | ✓                  | ✓                                          |
+| Time       | ✓                  | ✓ (+ date)                                 |
+| CPU / RAM  | —                  | ✓                                          |
+| Vi mode    | ✓ (prompt char)    | ✓ (full indicator)                         |
 
 > **Note**: p10k is in limited maintenance mode — no new features are in development.
 

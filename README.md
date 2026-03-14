@@ -53,6 +53,52 @@ eval "$(mehshell init zsh)"
 | Between commands | 6000ms (with vcs_info) | 28ms |
 | Prompt generation | ~45ms | 6ms |
 
+## Feature Comparison with Powerlevel10k
+
+mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick the right tool for your workflow.
+
+| Feature | mehshell | p10k |
+|---|---|---|
+| **Architecture** | Single Go binary | Zsh scripts + gitstatusd daemon |
+| **Dependencies** | Zero (Go stdlib only) | gitstatus binary (downloaded) |
+| **Prompt generation** | ~6ms | ~45ms |
+| **Shell startup impact** | ~64ms | ~870ms+ |
+| **Configuration** | Recompile | `~/.p10k.zsh` + config wizard |
+| **Async rendering** | Goroutines (parallel) | Zsh workers + gitstatusd |
+| **Git branch detection** | Zero-fork (reads `.git/HEAD`) | gitstatusd (libgit2) |
+| **Git dirty check** | `git status` with 150ms timeout | Async, never blocks |
+| **Instant prompt** | — | ✓ |
+| **Transient prompt** | — | ✓ |
+| **Custom segments** | Add in source | Public API (`p10k segment`) |
+| **Total segments** | 12 | 67+ |
+
+### Segment Coverage
+
+| Segment | mehshell | p10k |
+|---|---|---|
+| OS icon | ✓ | ✓ |
+| Directory | ✓ | ✓ (smart truncation) |
+| Git | ✓ (branch + dirty) | ✓ (branch, ahead/behind, stash, conflicts) |
+| Node.js | ✓ | ✓ (+ nvm, nodenv, package name) |
+| Python | ✓ | ✓ (+ pyenv, poetry) |
+| Go | ✓ | ✓ (+ goenv) |
+| Conda | ✓ | ✓ |
+| Virtualenv | ✓ | ✓ |
+| Kubernetes | ✓ | ✓ (+ show-on-command) |
+| AWS | ✓ | ✓ (+ Elastic Beanstalk) |
+| Duration | ✓ | ✓ |
+| Time | ✓ | ✓ (+ date) |
+| Rust | — | ✓ |
+| Ruby | — | ✓ |
+| Java | — | ✓ |
+| Terraform | — | ✓ |
+| Azure / GCP | — | ✓ |
+| Docker | — | ✓ |
+| Battery / CPU / RAM | — | ✓ |
+| Vi mode | — | ✓ |
+
+> **Note**: p10k is in limited maintenance mode — no new features are in development.
+
 ## Requirements
 
 - Go 1.22+ (build only)

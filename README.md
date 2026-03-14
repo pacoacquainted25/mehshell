@@ -84,21 +84,45 @@ Generate a default config file:
 mehshell config init
 ```
 
-This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`):
+This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`). See [config.example](config.example) for the full default config.
 
-```
-transient_prompt = true
-instant_prompt = true
-vi_mode = true
+### Features
 
-os = true
-dir = true
-git = true
-node = true
-battery = true
-time = true
-# ... all 20 segments are individually togglable
-```
+| Option | Default | Description |
+|---|---|---|
+| `transient_prompt` | `true` | Collapse previous prompts to `❯` on Enter. Set `false` to preserve full prompts with timestamps in scrollback. |
+| `instant_prompt` | `true` | Show cached prompt immediately on shell startup. |
+| `vi_mode` | `true` | Swap prompt character on vi keymap change (`❯`/`❮`). |
+
+### Left Segments
+
+| Option | Default | Description |
+|---|---|---|
+| `os` | `true` | OS icon (Arch, Ubuntu, Fedora, Debian, NixOS, macOS). |
+| `dir` | `true` | Current working directory. |
+| `git` | `true` | Git branch and dirty state (`✓`, `+`, `!`, `?`). |
+| `node` | `true` | Node.js version when `package.json` is present. |
+| `python` | `true` | Python version when marker files are found. |
+| `go` | `true` | Go version from `go.mod`. |
+| `rust` | `true` | Rust version when `Cargo.toml` is present. |
+| `ruby` | `true` | Ruby version when marker files are found. |
+| `java` | `true` | Java version when `pom.xml` or `build.gradle` is present. |
+
+### Right Segments
+
+| Option | Default | Description |
+|---|---|---|
+| `conda` | `true` | Conda environment name (skips `base`). |
+| `venv` | `true` | Python virtualenv name. |
+| `k8s` | `true` | Kubernetes context when manifest files are in cwd. |
+| `terraform` | `true` | Terraform version when `.tf` files are present. |
+| `docker` | `true` | Docker context when Dockerfile/compose is present. |
+| `aws` | `true` | AWS profile from `$AWS_PROFILE`. |
+| `azure` | `true` | Azure resource group from `$AZURE_DEFAULTS_GROUP`. |
+| `gcloud` | `true` | GCP project from `$CLOUDSDK_CORE_PROJECT`. |
+| `battery` | `true` | Battery level with charge state icon. |
+| `duration` | `true` | Command duration (shown when ≥ 3s). |
+| `time` | `true` | Current time. |
 
 Set any option to `false` to disable it. After editing, restart your shell or run:
 

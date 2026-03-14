@@ -1,0 +1,43 @@
+# mehshell configuration
+#
+# Copy to ~/.config/mehshell/config or run: mehshell config init
+# After changing, restart your shell or run: source <(mehshell init zsh)
+# All options default to true if not specified.
+
+# ── Features ────────────────────────────────────────────
+
+# Collapse previous prompts to a simple ">" on Enter.
+# Set to false to preserve full prompts with timestamps in scrollback.
+transient_prompt = true
+
+# Show cached prompt immediately on shell startup.
+instant_prompt = true
+
+# Swap prompt character on vi keymap change.
+vi_mode = true
+
+# ── Left segments ───────────────────────────────────────
+
+os = true
+dir = true
+git = true
+node = true
+python = true
+go = true
+rust = true
+ruby = true
+java = true
+
+# ── Right segments ──────────────────────────────────────
+
+conda = true
+venv = true
+k8s = true
+terraform = true
+docker = true
+aws = true
+azure = true
+gcloud = true
+battery = true
+duration = true
+time = true

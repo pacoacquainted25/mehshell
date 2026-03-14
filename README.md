@@ -27,6 +27,7 @@ A fast, parallelized prompt engine for zsh written in Go.
 - Instant prompt (caches last prompt for zero-latency shell startup).
 - Right-aligned segments on the first line.
 - Nerd Font icons.
+- Configurable via `~/.config/mehshell/config`.
 
 ## Install
 
@@ -75,6 +76,42 @@ Add this to your `.zshrc`:
 eval "$(mehshell init zsh)"
 ```
 
+## Configuration
+
+Generate a default config file:
+
+```bash
+mehshell config init
+```
+
+This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`):
+
+```
+transient_prompt = true
+instant_prompt = true
+vi_mode = true
+
+os = true
+dir = true
+git = true
+node = true
+battery = true
+time = true
+# ... all 20 segments are individually togglable
+```
+
+Set any option to `false` to disable it. After editing, restart your shell or run:
+
+```bash
+source <(mehshell init zsh)
+```
+
+To see where your config lives:
+
+```bash
+mehshell config path
+```
+
 ## Benchmarks
 
 | Metric | p10k | mehshell |
@@ -93,7 +130,7 @@ mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick th
 | **Dependencies** | Zero (Go stdlib only) | gitstatus binary (downloaded) |
 | **Prompt generation** | ~6ms | ~45ms |
 | **Shell startup impact** | ~64ms | ~870ms+ |
-| **Configuration** | Recompile | `~/.p10k.zsh` + config wizard |
+| **Configuration** | `~/.config/mehshell/config` | `~/.p10k.zsh` + config wizard |
 | **Async rendering** | Goroutines (parallel) | Zsh workers + gitstatusd |
 | **Git branch detection** | Zero-fork (reads `.git/HEAD`) | gitstatusd (libgit2) |
 | **Git dirty check** | `git status` with 150ms timeout | Async, never blocks |

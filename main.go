@@ -35,6 +35,7 @@ func fc(color int, s string) string {
 	if s == "" {
 		return ""
 	}
+	s = strings.ReplaceAll(s, "%", "%%")
 	return fmt.Sprintf("%%F{%d}%s%%f", color, s)
 }
 
@@ -45,36 +46,167 @@ type seg struct {
 	order int
 }
 
-// ── Main ─────────────────────────────────────────────────────────
+// ── Config ───────────────────────────────────────────────────────
 
-const zshInit = `zmodload zsh/datetime 2>/dev/null
-typeset -gi _mehshell_ts=0
-# Instant prompt: show cached prompt while plugins load
-[[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache" ]] && source "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache"
-_mehshell_preexec() { _mehshell_ts=$EPOCHSECONDS }
-_mehshell_precmd() {
-  local e=$? d=0
-  (( _mehshell_ts > 0 )) && d=$(( EPOCHSECONDS - _mehshell_ts ))
-  _mehshell_ts=0
-  local _out="$(mehshell $e $d $COLUMNS)"
-  eval "$_out"
-  print -r -- "$_out" >| "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache" 2>/dev/null
+type config struct {
+	TransientPrompt bool
+	InstantPrompt   bool
+	ViMode          bool
+	Segments        map[string]bool
 }
-# Vi mode: swap prompt char on keymap change
-_mehshell_zle_keymap_select() {
-  [[ $KEYMAP == vicmd ]] && PROMPT="${PROMPT/❯/❮}" || PROMPT="${PROMPT/❮/❯}"
-  zle reset-prompt
+
+func defaultConfig() config {
+	return config{
+		TransientPrompt: true,
+		InstantPrompt:   true,
+		ViMode:          true,
+		Segments: map[string]bool{
+			"os": true, "dir": true, "git": true, "node": true,
+			"python": true, "go": true, "rust": true, "ruby": true,
+			"java": true, "conda": true, "venv": true, "k8s": true,
+			"terraform": true, "docker": true, "aws": true, "azure": true,
+			"gcloud": true, "battery": true, "duration": true, "time": true,
+		},
+	}
 }
-# Transient prompt: simplify previous prompt on Enter
-_mehshell_accept_line() {
-  PROMPT=$'%F{76}❯%f '
-  zle reset-prompt
-  zle .accept-line
+
+func configPath() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "mehshell", "config")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "mehshell", "config")
 }
-zle -N zle-keymap-select _mehshell_zle_keymap_select
-zle -N accept-line _mehshell_accept_line
-preexec_functions+=(_mehshell_preexec)
-precmd_functions+=(_mehshell_precmd)`
+
+func loadConfig() config {
+	cfg := defaultConfig()
+	data, err := os.ReadFile(configPath())
+	if err != nil {
+		return cfg
+	}
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		on := val == "true" || val == "1" || val == "yes"
+		switch key {
+		case "transient_prompt":
+			cfg.TransientPrompt = on
+		case "instant_prompt":
+			cfg.InstantPrompt = on
+		case "vi_mode":
+			cfg.ViMode = on
+		default:
+			if _, ok := cfg.Segments[key]; ok {
+				cfg.Segments[key] = on
+			}
+		}
+	}
+	return cfg
+}
+
+const defaultConfigFile = `# mehshell configuration
+#
+# After changing, restart your shell or run: source <(mehshell init zsh)
+# All options default to true if not specified.
+
+# ── Features ────────────────────────────────────────────
+
+# Collapse previous prompts to a simple ">" on Enter.
+# Set to false to preserve full prompts with timestamps in scrollback.
+transient_prompt = true
+
+# Show cached prompt immediately on shell startup.
+instant_prompt = true
+
+# Swap prompt character on vi keymap change.
+vi_mode = true
+
+# ── Left segments ───────────────────────────────────────
+
+os = true
+dir = true
+git = true
+node = true
+python = true
+go = true
+rust = true
+ruby = true
+java = true
+
+# ── Right segments ──────────────────────────────────────
+
+conda = true
+venv = true
+k8s = true
+terraform = true
+docker = true
+aws = true
+azure = true
+gcloud = true
+battery = true
+duration = true
+time = true
+`
+
+// ── Zsh init ─────────────────────────────────────────────────────
+
+func zshInitScript(cfg config) string {
+	bin := "mehshell"
+	if exe, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			bin = resolved
+		} else {
+			bin = exe
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("zmodload zsh/datetime 2>/dev/null\n")
+	b.WriteString("typeset -gi _mehshell_ts=0\n")
+	if cfg.InstantPrompt {
+		b.WriteString("[[ -r \"${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache\" ]] && source \"${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache\"\n")
+	}
+	b.WriteString("_mehshell_preexec() { _mehshell_ts=$EPOCHSECONDS }\n")
+	b.WriteString("_mehshell_precmd() {\n")
+	b.WriteString("  local e=$? d=0\n")
+	b.WriteString("  (( _mehshell_ts > 0 )) && d=$(( EPOCHSECONDS - _mehshell_ts ))\n")
+	b.WriteString("  _mehshell_ts=0\n")
+	b.WriteString(fmt.Sprintf("  local _out=\"$(%s $e $d $COLUMNS)\"\n", bin))
+	b.WriteString("  eval \"$_out\"\n")
+	if cfg.InstantPrompt {
+		b.WriteString("  print -r -- \"$_out\" >| \"${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache\" 2>/dev/null\n")
+	}
+	b.WriteString("}\n")
+	if cfg.ViMode {
+		b.WriteString("_mehshell_zle_keymap_select() {\n")
+		b.WriteString("  [[ $KEYMAP == vicmd ]] && PROMPT=\"${PROMPT/❯/❮}\" || PROMPT=\"${PROMPT/❮/❯}\"\n")
+		b.WriteString("  zle reset-prompt\n")
+		b.WriteString("}\n")
+		b.WriteString("zle -N zle-keymap-select _mehshell_zle_keymap_select\n")
+	}
+	if cfg.TransientPrompt {
+		b.WriteString("_mehshell_accept_line() {\n")
+		b.WriteString("  PROMPT=$'%F{76}❯%f '\n")
+		b.WriteString("  zle reset-prompt\n")
+		b.WriteString("  zle .accept-line\n")
+		b.WriteString("}\n")
+		b.WriteString("zle -N accept-line _mehshell_accept_line\n")
+	}
+	b.WriteString("preexec_functions+=(_mehshell_preexec)\n")
+	b.WriteString("precmd_functions+=(_mehshell_precmd)")
+	return b.String()
+}
+
+// ── Main ─────────────────────────────────────────────────────────
 
 func main() {
 	if len(os.Args) > 1 {
@@ -84,14 +216,41 @@ func main() {
 			return
 		case "init":
 			if len(os.Args) > 2 && os.Args[2] == "zsh" {
-				fmt.Println(zshInit)
+				cfg := loadConfig()
+				fmt.Println(zshInitScript(cfg))
 			} else {
 				fmt.Fprintln(os.Stderr, "usage: mehshell init zsh")
 				os.Exit(1)
 			}
 			return
+		case "config":
+			if len(os.Args) > 2 && os.Args[2] == "init" {
+				p := configPath()
+				if _, err := os.Stat(p); err == nil {
+					fmt.Fprintln(os.Stderr, "config already exists:", p)
+					os.Exit(1)
+				}
+				if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+					fmt.Fprintln(os.Stderr, "error:", err)
+					os.Exit(1)
+				}
+				if err := os.WriteFile(p, []byte(defaultConfigFile), 0644); err != nil {
+					fmt.Fprintln(os.Stderr, "error:", err)
+					os.Exit(1)
+				}
+				fmt.Println("created", p)
+			} else if len(os.Args) > 2 && os.Args[2] == "path" {
+				fmt.Println(configPath())
+			} else {
+				fmt.Fprintln(os.Stderr, "usage: mehshell config [init|path]")
+				os.Exit(1)
+			}
+			return
 		}
 	}
+
+	cfg := loadConfig()
+	on := cfg.Segments
 
 	exitCode := 0
 	duration := 0
@@ -129,29 +288,66 @@ func main() {
 		}()
 	}
 
-	// Left segments
-	add(&left, 0, func() string { return segOS() })
-	add(&left, 1, func() string { return segDir(cwd, home) })
-	add(&left, 2, func() string { return segGit(cwd) })
-	add(&left, 3, func() string { return segNode(cwd) })
-	add(&left, 4, func() string { return segPython(cwd) })
-	add(&left, 5, func() string { return segGo(cwd) })
-	add(&left, 6, func() string { return segRust(cwd) })
-	add(&left, 7, func() string { return segRuby(cwd) })
-	add(&left, 8, func() string { return segJava(cwd) })
-
-	// Right segments
-	add(&right, 0, func() string { return segConda() })
-	add(&right, 1, func() string { return segVenv() })
-	add(&right, 2, func() string { return segK8s(cwd, home) })
-	add(&right, 3, func() string { return segTerraform(cwd) })
-	add(&right, 4, func() string { return segDocker(cwd) })
-	add(&right, 5, func() string { return segAWS() })
-	add(&right, 6, func() string { return segAzure() })
-	add(&right, 7, func() string { return segGCloud() })
-	add(&right, 8, func() string { return segBattery() })
-	add(&right, 9, func() string { return segDuration(duration) })
-	add(&right, 10, func() string { return segTime() })
+	if on["os"] {
+		add(&left, 0, func() string { return segOS() })
+	}
+	if on["dir"] {
+		add(&left, 1, func() string { return segDir(cwd, home) })
+	}
+	if on["git"] {
+		add(&left, 2, func() string { return segGit(cwd) })
+	}
+	if on["node"] {
+		add(&left, 3, func() string { return segNode(cwd) })
+	}
+	if on["python"] {
+		add(&left, 4, func() string { return segPython(cwd) })
+	}
+	if on["go"] {
+		add(&left, 5, func() string { return segGo(cwd) })
+	}
+	if on["rust"] {
+		add(&left, 6, func() string { return segRust(cwd) })
+	}
+	if on["ruby"] {
+		add(&left, 7, func() string { return segRuby(cwd) })
+	}
+	if on["java"] {
+		add(&left, 8, func() string { return segJava(cwd) })
+	}
+	if on["conda"] {
+		add(&right, 0, func() string { return segConda() })
+	}
+	if on["venv"] {
+		add(&right, 1, func() string { return segVenv() })
+	}
+	if on["k8s"] {
+		add(&right, 2, func() string { return segK8s(cwd, home) })
+	}
+	if on["terraform"] {
+		add(&right, 3, func() string { return segTerraform(cwd) })
+	}
+	if on["docker"] {
+		add(&right, 4, func() string { return segDocker(cwd) })
+	}
+	if on["aws"] {
+		add(&right, 5, func() string { return segAWS() })
+	}
+	if on["azure"] {
+		add(&right, 6, func() string { return segAzure() })
+	}
+	if on["gcloud"] {
+		add(&right, 7, func() string { return segGCloud() })
+	}
+	if on["battery"] {
+		add(&right, 8, func() string { return segBattery() })
+	}
+	if on["duration"] {
+		add(&right, 9, func() string { return segDuration(duration) })
+	}
+	if on["time"] {
+		add(&right, 10, func() string { return segTime() })
+	}
 
 	wg.Wait()
 

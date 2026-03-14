@@ -1,12 +1,11 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-03-13
-**Commit:** 4a7f0b0
+**Generated:** 2026-03-14
 **Branch:** master
 
 ## OVERVIEW
 
-Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`. Supports instant prompt, transient prompt, and vi mode.
+Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`. Supports instant prompt, transient prompt, vi mode, and config file at `~/.config/mehshell/config`.
 
 ## STRUCTURE
 
@@ -27,11 +26,11 @@ Single-file monolith. No packages, no internal/, no cmd/. Intentional — projec
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add/modify prompt segment | `main.go` L128-153 (registration), segment func below | Follow `seg*()` pattern |
-| Git detection | `main.go` L353-444 | Zero-fork branch via `.git/HEAD`, 150ms timeout on dirty |
-| Zsh init script | `main.go` L50-61 | Embedded `precmd`/`preexec` hooks |
+| Add/modify prompt segment | `main.go` segment registration in `main()` | Follow `seg*()` pattern, gate with `on["name"]` |
+| Config system | `main.go` `config` struct, `loadConfig()`, `configPath()` | `~/.config/mehshell/config`, key=value format |
+| Zsh init script | `main.go` `zshInitScript()` | Dynamic generation based on config |
+| Git detection | `main.go` `gitBranch()`, `gitDirty()` | Zero-fork branch via `.git/HEAD`, 150ms timeout on dirty |
 | Color constants | `main.go` L23-32 | Zsh 256-color codes |
-| Zsh init script | `main.go` L50-61 | Embedded `precmd`/`preexec` hooks |
 | Version injection | `main.go` L19 | Set via ldflags: `-X main.Version={{.Version}}` |
 | Release config | `.goreleaser.yml` | Linux + macOS, amd64 + arm64, CGO off |
 | CI pipeline | `.github/workflows/release.yml` | Triggers on `v*` tags |
@@ -40,7 +39,7 @@ Single-file monolith. No packages, no internal/, no cmd/. Intentional — projec
 
 ### Execution Flow
 1. Zsh `precmd` hook calls `mehshell <exitCode> <duration> <columns>`
-2. `main()` spawns 20 goroutines (9 left + 11 right segments) via `sync.WaitGroup`
+2. `main()` loads config, spawns goroutines for enabled segments via `sync.WaitGroup`
 3. Each `seg*()` returns formatted string or `""` (skip)
 4. Mutex-protected append to `left`/`right` slices, sorted by `order`
 5. Right-aligned line 1 + prompt char line 2 → `PROMPT=$'...'`
@@ -106,11 +105,17 @@ go build
 # Init script
 ./mehshell init zsh
 
+# Create default config
+./mehshell config init
+
+# Show config path
+./mehshell config path
+
 # Version
 ./mehshell --version
 
-# Release (CI only, via tag)
-git tag v0.X.X && git push origin v0.X.X
+# Release (auto on push to master)
+git push origin master
 ```
 
 ## NOTES

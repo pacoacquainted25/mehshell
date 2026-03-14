@@ -4,10 +4,7 @@ A fast, parallelized prompt engine for zsh written in Go.
 
 ## Prompt Example
 
-```text
-╭─  ~/project  main ✓  v22.11.0                  ⎈ minikube  3s  04:20:47 PM
-╰─❯
-```
+![Prompt styles](docs/screenshots/prompt_styles_screenshot.png)
 
 ## Features
 

@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`.
+Fast, parallelized zsh prompt engine. Single Go binary, stdlib-only, ~6ms per prompt. Outputs `PROMPT` variable via `eval "$(mehshell $e $d $COLUMNS)"`. Supports instant prompt, transient prompt, and vi mode.
 
 ## STRUCTURE
 
@@ -27,8 +27,9 @@ Single-file monolith. No packages, no internal/, no cmd/. Intentional — projec
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add/modify prompt segment | `main.go` L116-131 (registration), segment func below | Follow `seg*()` pattern |
+| Add/modify prompt segment | `main.go` L128-153 (registration), segment func below | Follow `seg*()` pattern |
 | Git detection | `main.go` L353-444 | Zero-fork branch via `.git/HEAD`, 150ms timeout on dirty |
+| Zsh init script | `main.go` L50-61 | Embedded `precmd`/`preexec` hooks |
 | Color constants | `main.go` L23-32 | Zsh 256-color codes |
 | Zsh init script | `main.go` L50-61 | Embedded `precmd`/`preexec` hooks |
 | Version injection | `main.go` L19 | Set via ldflags: `-X main.Version={{.Version}}` |
@@ -39,7 +40,7 @@ Single-file monolith. No packages, no internal/, no cmd/. Intentional — projec
 
 ### Execution Flow
 1. Zsh `precmd` hook calls `mehshell <exitCode> <duration> <columns>`
-2. `main()` spawns 12 goroutines (6 left + 6 right segments) via `sync.WaitGroup`
+2. `main()` spawns 20 goroutines (9 left + 11 right segments) via `sync.WaitGroup`
 3. Each `seg*()` returns formatted string or `""` (skip)
 4. Mutex-protected append to `left`/`right` slices, sorted by `order`
 5. Right-aligned line 1 + prompt char line 2 → `PROMPT=$'...'`
@@ -61,12 +62,20 @@ add(&left, ORDER, func() string { return segFoo(args) })
 | `segNode` | left | 3 | `package.json` in cwd |
 | `segPython` | left | 4 | Marker files walking up |
 | `segGo` | left | 5 | `go.mod` in cwd |
+| `segRust` | left | 6 | `Cargo.toml` in cwd |
+| `segRuby` | left | 7 | Marker files walking up |
+| `segJava` | left | 8 | `pom.xml`, `build.gradle` in cwd |
 | `segConda` | right | 0 | `$CONDA_DEFAULT_ENV` set (not "base") |
 | `segVenv` | right | 1 | `$VIRTUAL_ENV` set |
 | `segK8s` | right | 2 | K8s manifest in cwd |
-| `segAWS` | right | 3 | `$AWS_PROFILE` set |
-| `segDuration` | right | 4 | Duration ≥ 3s |
-| `segTime` | right | 5 | Always |
+| `segTerraform` | right | 3 | `.tf` files in cwd |
+| `segDocker` | right | 4 | Dockerfile/compose in cwd |
+| `segAWS` | right | 5 | `$AWS_PROFILE` set |
+| `segAzure` | right | 6 | `$AZURE_DEFAULTS_GROUP` set |
+| `segGCloud` | right | 7 | `$CLOUDSDK_CORE_PROJECT` / `$GCLOUD_PROJECT` set |
+| `segBattery` | right | 8 | Battery present (Linux `/sys/`, macOS `pmset`) |
+| `segDuration` | right | 9 | Duration ≥ 3s |
+| `segTime` | right | 10 | Always |
 
 ## CONVENTIONS
 

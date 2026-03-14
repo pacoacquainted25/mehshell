@@ -16,10 +16,15 @@ A fast, parallelized prompt engine for zsh written in Go.
 - Git dirty check with 150ms timeout. It never blocks, even in huge repos.
 - Zero-fork git branch detection. It reads .git/HEAD directly.
 - OS icon auto-detection for Arch, Ubuntu, Fedora, Debian, NixOS, and macOS.
-- Runtime version detection for Node.js, Python, and Go when marker files are present.
-- Cloud context support for Kubernetes and AWS profiles.
+- Runtime version detection for Node.js, Python, Go, Rust, Ruby, and Java when marker files are present.
+- Cloud context support for Kubernetes, AWS, Azure, and GCP profiles.
+- Terraform workspace and Docker context detection.
 - Environment detection for Conda and virtualenv.
+- Battery level with charge state icons.
 - Command duration (3s+), time, and exit code coloring.
+- Vi mode indicator (swaps prompt char on keymap change).
+- Transient prompt (collapses previous prompt on Enter).
+- Instant prompt (caches last prompt for zero-latency shell startup).
 - Right-aligned segments on the first line.
 - Nerd Font icons.
 
@@ -67,10 +72,11 @@ mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick th
 | **Async rendering** | Goroutines (parallel) | Zsh workers + gitstatusd |
 | **Git branch detection** | Zero-fork (reads `.git/HEAD`) | gitstatusd (libgit2) |
 | **Git dirty check** | `git status` with 150ms timeout | Async, never blocks |
-| **Instant prompt** | — | ✓ |
-| **Transient prompt** | — | ✓ |
+| **Instant prompt** | ✓ (cache-based) | ✓ |
+| **Transient prompt** | ✓ | ✓ |
+| **Vi mode** | ✓ (prompt char swap) | ✓ (full indicator) |
 | **Custom segments** | Add in source | Public API (`p10k segment`) |
-| **Total segments** | 12 | 67+ |
+| **Total segments** | 20 | 67+ |
 
 ### Segment Coverage
 
@@ -82,20 +88,22 @@ mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick th
 | Node.js | ✓ | ✓ (+ nvm, nodenv, package name) |
 | Python | ✓ | ✓ (+ pyenv, poetry) |
 | Go | ✓ | ✓ (+ goenv) |
+| Rust | ✓ | ✓ |
+| Ruby | ✓ | ✓ (+ rvm, chruby) |
+| Java | ✓ | ✓ (+ jenv) |
 | Conda | ✓ | ✓ |
 | Virtualenv | ✓ | ✓ |
 | Kubernetes | ✓ | ✓ (+ show-on-command) |
+| Terraform | ✓ | ✓ |
+| Docker | ✓ | ✓ |
 | AWS | ✓ | ✓ (+ Elastic Beanstalk) |
+| Azure | ✓ | ✓ |
+| GCP | ✓ | ✓ |
+| Battery | ✓ | ✓ |
 | Duration | ✓ | ✓ |
 | Time | ✓ | ✓ (+ date) |
-| Rust | — | ✓ |
-| Ruby | — | ✓ |
-| Java | — | ✓ |
-| Terraform | — | ✓ |
-| Azure / GCP | — | ✓ |
-| Docker | — | ✓ |
-| Battery / CPU / RAM | — | ✓ |
-| Vi mode | — | ✓ |
+| CPU / RAM | — | ✓ |
+| Vi mode | ✓ (prompt char) | ✓ (full indicator) |
 
 > **Note**: p10k is in limited maintenance mode — no new features are in development.
 

@@ -49,14 +49,30 @@ type seg struct {
 
 const zshInit = `zmodload zsh/datetime 2>/dev/null
 typeset -gi _mehshell_ts=0
+# Instant prompt: show cached prompt while plugins load
+[[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache" ]] && source "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache"
 _mehshell_preexec() { _mehshell_ts=$EPOCHSECONDS }
 _mehshell_precmd() {
-  local e=$?
-  local d=0
+  local e=$? d=0
   (( _mehshell_ts > 0 )) && d=$(( EPOCHSECONDS - _mehshell_ts ))
   _mehshell_ts=0
-  eval "$(mehshell $e $d $COLUMNS)"
+  local _out="$(mehshell $e $d $COLUMNS)"
+  eval "$_out"
+  print -r -- "$_out" >| "${XDG_CACHE_HOME:-$HOME/.cache}/mehshell-prompt-cache" 2>/dev/null
 }
+# Vi mode: swap prompt char on keymap change
+_mehshell_zle_keymap_select() {
+  [[ $KEYMAP == vicmd ]] && PROMPT="${PROMPT/❯/❮}" || PROMPT="${PROMPT/❮/❯}"
+  zle reset-prompt
+}
+# Transient prompt: simplify previous prompt on Enter
+_mehshell_accept_line() {
+  PROMPT=$'%F{76}❯%f '
+  zle reset-prompt
+  zle .accept-line
+}
+zle -N zle-keymap-select _mehshell_zle_keymap_select
+zle -N accept-line _mehshell_accept_line
 preexec_functions+=(_mehshell_preexec)
 precmd_functions+=(_mehshell_precmd)`
 
@@ -120,14 +136,22 @@ func main() {
 	add(&left, 3, func() string { return segNode(cwd) })
 	add(&left, 4, func() string { return segPython(cwd) })
 	add(&left, 5, func() string { return segGo(cwd) })
+	add(&left, 6, func() string { return segRust(cwd) })
+	add(&left, 7, func() string { return segRuby(cwd) })
+	add(&left, 8, func() string { return segJava(cwd) })
 
 	// Right segments
 	add(&right, 0, func() string { return segConda() })
 	add(&right, 1, func() string { return segVenv() })
 	add(&right, 2, func() string { return segK8s(cwd, home) })
-	add(&right, 3, func() string { return segAWS() })
-	add(&right, 4, func() string { return segDuration(duration) })
-	add(&right, 5, func() string { return segTime() })
+	add(&right, 3, func() string { return segTerraform(cwd) })
+	add(&right, 4, func() string { return segDocker(cwd) })
+	add(&right, 5, func() string { return segAWS() })
+	add(&right, 6, func() string { return segAzure() })
+	add(&right, 7, func() string { return segGCloud() })
+	add(&right, 8, func() string { return segBattery() })
+	add(&right, 9, func() string { return segDuration(duration) })
+	add(&right, 10, func() string { return segTime() })
 
 	wg.Wait()
 
@@ -348,6 +372,257 @@ func segDuration(secs int) string {
 
 func segTime() string {
 	return fc(cGray, time.Now().Format("03:04:05 PM"))
+}
+
+// ── Additional segments ─────────────────────────────────────────
+
+func segRust(cwd string) string {
+	if _, err := os.Stat(filepath.Join(cwd, "Cargo.toml")); err != nil {
+		return ""
+	}
+	for _, f := range []string{"rust-toolchain", ".rust-version"} {
+		if data, err := os.ReadFile(filepath.Join(cwd, f)); err == nil {
+			ver := strings.TrimSpace(string(data))
+			if ver != "" {
+				return fc(cOrange, "\ue7a8 "+ver)
+			}
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(cwd, "rust-toolchain.toml")); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "channel") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					ver := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+					if ver != "" {
+						return fc(cOrange, "\ue7a8 "+ver)
+					}
+				}
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "rustc", "--version").Output(); err == nil {
+		ver := strings.TrimPrefix(strings.TrimSpace(string(out)), "rustc ")
+		if i := strings.Index(ver, " "); i != -1 {
+			ver = ver[:i]
+		}
+		return fc(cOrange, "\ue7a8 "+ver)
+	}
+	return ""
+}
+
+func segRuby(cwd string) string {
+	if !hasMarkerUp(cwd, []string{".ruby-version", "Gemfile", "Rakefile"}) {
+		return ""
+	}
+	if data, err := os.ReadFile(filepath.Join(cwd, ".ruby-version")); err == nil {
+		ver := strings.TrimSpace(string(data))
+		if ver != "" {
+			return fc(cRed, "\ue739 "+ver)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "ruby", "--version").Output(); err == nil {
+		ver := strings.TrimPrefix(strings.TrimSpace(string(out)), "ruby ")
+		if i := strings.Index(ver, " "); i != -1 {
+			ver = ver[:i]
+		}
+		return fc(cRed, "\ue739 "+ver)
+	}
+	return ""
+}
+
+func segJava(cwd string) string {
+	markers := []string{"pom.xml", "build.gradle", "build.gradle.kts", ".java-version"}
+	found := false
+	for _, m := range markers {
+		if _, err := os.Stat(filepath.Join(cwd, m)); err == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ""
+	}
+	if data, err := os.ReadFile(filepath.Join(cwd, ".java-version")); err == nil {
+		ver := strings.TrimSpace(string(data))
+		if ver != "" {
+			return fc(cOrange, "\ue738 "+ver)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "java", "-version").CombinedOutput(); err == nil {
+		line := strings.SplitN(string(out), "\n", 2)[0]
+		if start := strings.Index(line, "\""); start != -1 {
+			if end := strings.Index(line[start+1:], "\""); end != -1 {
+				return fc(cOrange, "\ue738 "+line[start+1:start+1+end])
+			}
+		}
+	}
+	return ""
+}
+
+func segTerraform(cwd string) string {
+	entries, err := os.ReadDir(cwd)
+	if err != nil {
+		return ""
+	}
+	hasTF := false
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".tf") {
+			hasTF = true
+			break
+		}
+	}
+	if !hasTF {
+		return ""
+	}
+	if data, err := os.ReadFile(filepath.Join(cwd, ".terraform-version")); err == nil {
+		ver := strings.TrimSpace(string(data))
+		if ver != "" {
+			return fc(cMagenta, "\uf0ac "+ver)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "terraform", "version").Output(); err == nil {
+		line := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
+		line = strings.TrimPrefix(line, "Terraform ")
+		return fc(cMagenta, "\uf0ac "+line)
+	}
+	return ""
+}
+
+func segDocker(cwd string) string {
+	markers := []string{"Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
+	found := false
+	for _, m := range markers {
+		if _, err := os.Stat(filepath.Join(cwd, m)); err == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ""
+	}
+	if ctx := os.Getenv("DOCKER_CONTEXT"); ctx != "" && ctx != "default" {
+		return fc(cCyan, "\uf308 "+ctx)
+	}
+	if name := os.Getenv("DOCKER_MACHINE_NAME"); name != "" {
+		return fc(cCyan, "\uf308 "+name)
+	}
+	return fc(cCyan, "\uf308")
+}
+
+func segAzure() string {
+	acct := os.Getenv("AZURE_DEFAULTS_GROUP")
+	if acct == "" {
+		return ""
+	}
+	return fc(cBlue, "\ufd03 "+acct)
+}
+
+func segGCloud() string {
+	project := os.Getenv("CLOUDSDK_CORE_PROJECT")
+	if project == "" {
+		project = os.Getenv("GCLOUD_PROJECT")
+	}
+	if project == "" {
+		project = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	}
+	if project == "" {
+		return ""
+	}
+	return fc(cGreen, "\uf1a0 "+project)
+}
+
+func segBattery() string {
+	switch runtime.GOOS {
+	case "linux":
+		for _, name := range []string{"BAT0", "BAT1", "battery"} {
+			data, err := os.ReadFile(filepath.Join("/sys/class/power_supply", name, "capacity"))
+			if err != nil {
+				continue
+			}
+			pct, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			if err != nil {
+				continue
+			}
+			statusData, _ := os.ReadFile(filepath.Join("/sys/class/power_supply", name, "status"))
+			status := strings.TrimSpace(string(statusData))
+
+			icon := "\uf240"
+			color := cGreen
+			switch {
+			case pct <= 10:
+				icon = "\uf244"
+				color = cRed
+			case pct <= 25:
+				icon = "\uf243"
+				color = cOrange
+			case pct <= 50:
+				icon = "\uf242"
+				color = cYellow
+			case pct <= 75:
+				icon = "\uf241"
+				color = cGreen
+			}
+			if status == "Charging" {
+				icon = "\uf0e7"
+			}
+			return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+		}
+	case "darwin":
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "pmset", "-g", "batt").Output()
+		if err != nil {
+			return ""
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			if !strings.Contains(line, "InternalBattery") {
+				continue
+			}
+			idx := strings.Index(line, "%")
+			if idx == -1 {
+				continue
+			}
+			start := idx - 1
+			for start >= 0 && line[start] >= '0' && line[start] <= '9' {
+				start--
+			}
+			pct, err := strconv.Atoi(strings.TrimSpace(line[start+1 : idx]))
+			if err != nil {
+				continue
+			}
+			icon := "\uf240"
+			color := cGreen
+			switch {
+			case pct <= 10:
+				icon = "\uf244"
+				color = cRed
+			case pct <= 25:
+				icon = "\uf243"
+				color = cOrange
+			case pct <= 50:
+				icon = "\uf242"
+				color = cYellow
+			case pct <= 75:
+				icon = "\uf241"
+				color = cGreen
+			}
+			if strings.Contains(line, "charging") && !strings.Contains(line, "discharging") {
+				icon = "\uf0e7"
+			}
+			return fc(color, icon+" "+strconv.Itoa(pct)+"%")
+		}
+	}
+	return ""
 }
 
 // ── Git helpers ──────────────────────────────────────────────────

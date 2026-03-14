@@ -30,10 +30,35 @@ A fast, parallelized prompt engine for zsh written in Go.
 
 ## Install
 
-### Binary releases
+### Homebrew (macOS & Linux)
 
 ```bash
+brew tap blackflame007/tap
+brew install mehshell
+```
+
+### AUR (Arch Linux)
+
+```bash
+yay -S mehshell-bin
+```
+
+### Binary releases
+
+Download a prebuilt binary from [GitHub Releases](https://github.com/blackflame007/mehshell/releases/latest):
+
+```bash
+# Linux (x86_64)
 curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_linux_amd64.tar.gz | tar xz && mv mehshell ~/.local/bin/
+
+# Linux (ARM64)
+curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_linux_arm64.tar.gz | tar xz && mv mehshell ~/.local/bin/
+
+# macOS (Apple Silicon)
+curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_darwin_arm64.tar.gz | tar xz && mv mehshell ~/.local/bin/
+
+# macOS (Intel)
+curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_darwin_amd64.tar.gz | tar xz && mv mehshell ~/.local/bin/
 ```
 
 ### From source

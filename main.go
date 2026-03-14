@@ -192,7 +192,7 @@ func segGit(cwd string) string {
 }
 
 func segNode(cwd string) string {
-	if !hasMarkerUp(cwd, []string{"package.json", ".nvmrc", ".node-version"}) {
+	if _, err := os.Stat(filepath.Join(cwd, "package.json")); err != nil {
 		return ""
 	}
 	// Try reading version files first (no fork)

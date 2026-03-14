@@ -4,6 +4,12 @@ on:
   push:
     branches: [master]
     tags: ["v*"]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".goreleaser.yml"
+      - ".github/workflows/release.yml"
 
 permissions:
   contents: write

